@@ -14,18 +14,23 @@
 # release workflow:
 #   1. IAM > Identity providers > add the GitHub OIDC provider
 #      (token.actions.githubusercontent.com).
-#   2. Create a role trusted by that provider, with the trust policy
-#      condition sub = repo:thesimpledev/goZipClip:ref:refs/tags/v*
+#   2. Create a role trusted by that provider, with trust policy sub
+#      conditions for refs/tags/linux-v* and refs/tags/windows-v*
+#      (role zipclip-release already exists with these).
 #   3. Give it one permission: s3:PutObject on
 #      arn:aws:s3:::gozipclip.com-825a66c84550b1da/downloads/*
 #   4. Store the role ARN as the repository secret AWS_RELEASE_ROLE_ARN.
+#
+# Each deployment has its own tag namespace: linux-v* releases Linux,
+# windows-v* releases Windows, and the website deploys separately.
+# Tagging linux-v0.2.0 touches nothing but the Linux download.
 
 name: Release Linux
 
 on:
   push:
     tags:
-      - "v*"
+      - "linux-v*"
 
 permissions:
   contents: read

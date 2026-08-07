@@ -12,13 +12,17 @@
 #
 # One-time AWS setup is documented in release-linux.yml; both release
 # workflows share the same role and the AWS_RELEASE_ROLE_ARN secret.
+#
+# Each deployment has its own tag namespace: windows-v* releases
+# Windows only. Linux uses linux-v*, and the website deploys
+# separately.
 
 name: Release Windows
 
 on:
   push:
     tags:
-      - "v*"
+      - "windows-v*"
 
 permissions:
   contents: read

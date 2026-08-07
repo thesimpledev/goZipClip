@@ -61,12 +61,16 @@ from installing the tools to turning on automatic mode, is in
 
 ## Releasing
 
-Pushing a `v*` tag triggers two independent GitHub Actions workflows,
-`Release Linux` and `Release Windows`. Each builds on a native runner of its
-platform, runs the test suite, and uploads its archive to the website's
-download location. The website deploys separately through its own workflow.
-The one-time AWS setup is documented at the top of
-`.github/workflows/release-linux.yml`.
+Each deployment is separate and has its own tag namespace:
+
+- `linux-v*` triggers `Release Linux` only.
+- `windows-v*` triggers `Release Windows` only.
+- The website deploys through its own workflow, independent of both.
+
+Each release workflow builds on a native runner of its platform, runs the
+test suite, and uploads its archive to the website's download location.
+Releasing one platform never touches the other. The one-time AWS setup is
+documented at the top of `.github/workflows/release-linux.yml`.
 
 ## License
 
