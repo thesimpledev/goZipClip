@@ -1,0 +1,67 @@
+name: Deploy Website
+
+on:
+  push:
+    tags:
+      - 'web-v*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.WEBSITE_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-2
+
+      # Upload in phases so a visitor mid-deploy can never land on a page
+      # whose assets are already gone: assets first, HTML second, and
+      # deletions only after every edge serves the new HTML.
+      #
+      # images/21.png is the 5000px source art; the site references only
+      # the files derived from it, so it never gets uploaded.
+
+      - name: Upload assets (new files alongside old)
+        run: |
+          aws s3 sync website/ s3://${{ vars.PROD_S3_BUCKET }} \
+            --exclude "*.html" \
+            --exclude "images/21.png" \
+            --exclude "README.md" \
+            --exclude "DOWNLOADS.md" \
+            --cache-control "public, max-age=86400"
+
+      - name: Upload HTML
+        run: |
+          aws s3 sync website/ s3://${{ vars.PROD_S3_BUCKET }} \
+            --exclude "*" --include "*.html" \
+            --cache-control "public, max-age=300"
+
+      - name: Invalidate CloudFront cache
+        if: vars.PROD_CLOUDFRONT_DISTRIBUTION_ID != ''
+        run: |
+          ID=$(aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.PROD_CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*" --query 'Invalidation.Id' --output text)
+          echo "waiting on invalidation $ID"
+          aws cloudfront wait invalidation-completed \
+            --distribution-id ${{ vars.PROD_CLOUDFRONT_DISTRIBUTION_ID }} \
+            --id "$ID"
+
+      - name: Remove files from previous deploys
+        run: |
+          # downloads/ is uploaded by the app release flow, not present in
+          # the website/ folder, so it must survive the delete pass.
+          aws s3 sync website/ s3://${{ vars.PROD_S3_BUCKET }} --delete \
+            --exclude "images/21.png" \
+            --exclude "README.md" \
+            --exclude "DOWNLOADS.md" \
+            --exclude "downloads/*"
