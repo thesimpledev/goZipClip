@@ -12,16 +12,20 @@ us-east-2.
   static website hosting, index `index.html`, error `404.html`)
 - Website endpoint:
   http://gozipclip.com-825a66c84550b1da.s3-website.us-east-2.amazonaws.com/
+- Route53 hosted zone `Z0526660FGC9U5TQ7PDL` (domain registered at an
+  external registrar, NS delegated to Route53)
+- ACM certificate in us-east-1 for gozipclip.com + www, DNS validated
+- CloudFront distribution `E3NC6RSCQ4HAGH` (http-only custom origin on
+  the website endpoint, redirect-to-https, CachingOptimized, compress,
+  TLSv1.2_2021)
+- A alias records for apex and www to the distribution
+- IAM role `zipclip-website-deploy` for GitHub OIDC (trust matches both
+  the legacy `repo:owner/name` and the newer `repo:owner@id/name@id`
+  subject formats; new repos get the id-embedded form)
 
 ## Not yet done
 
-- Register gozipclip.com (registrar decision pending)
-- Route53 hosted zone, then NS delegation at the registrar
-- ACM certificate in us-east-1 for gozipclip.com + www
-- CloudFront distribution (http-only custom origin pointing at the
-  website endpoint, redirect-to-https, CachingOptimized, compress)
-- A/AAAA alias records to the distribution
-- Real download links once the app ships
+- Real download links once the app ships (see DOWNLOADS.md)
 
 ## Deploying changes
 
