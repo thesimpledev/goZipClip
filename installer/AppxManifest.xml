@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest template for the Microsoft Store build.
+  {{VERSION}} is filled in by installer\build-msix.ps1 (4-part, revision 0).
+
+  Identity values come from Partner Center > ZipClip > Product identity.
+  They are fixed per Store listing - do not edit per release:
+    Package Family Name: TheSimpleDev.ZipClip_zvgc1ynszgpq2
+    Store ID:            9N694TPBZ0GN
+
+  runFullTrust is required and expected for a packaged desktop app:
+  ZipClip shells out to the user's own yt-dlp and ffmpeg installs and
+  reads/writes user-chosen folders, none of which the UWP sandbox allows.
+-->
+<Package
+    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+    IgnorableNamespaces="uap rescap">
+
+  <Identity Name="TheSimpleDev.ZipClip"
+            Publisher="CN=7BF8A48F-7EC9-41A4-861E-5AC76F45DE76"
+            Version="{{VERSION}}"
+            ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>ZipClip</DisplayName>
+    <PublisherDisplayName>The Simple Dev</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop"
+                        MinVersion="10.0.17763.0"
+                        MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="ZipClip" Executable="zipclip.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+          DisplayName="ZipClip"
+          Description="Turns Twitch VODs into upload-ready videos automatically: downloads new VODs, trims the prestream waiting screen, and splices in your intro."
+          Square150x150Logo="Assets\Square150x150Logo.png"
+          Square44x44Logo="Assets\Square44x44Logo.png"
+          BackgroundColor="transparent" />
+    </Application>
+  </Applications>
+</Package>
