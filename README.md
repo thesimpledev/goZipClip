@@ -58,6 +58,15 @@ can ask whether the channel is live. Setup steps are in
   instructions are in its README.
 - `website/` - the gozipclip.com site serving the downloads.
 
+## Releasing
+
+Pushing a `v*` tag triggers two independent GitHub Actions workflows,
+`Release Linux` and `Release Windows`. Each builds on a native runner of its
+platform, runs the test suite, and uploads its archive to the website's
+download location. The website deploys separately through its own workflow.
+The one-time AWS setup is documented at the top of
+`.github/workflows/release-linux.yml`.
+
 ## License
 
 MIT, see [desktop/LICENSE](desktop/LICENSE).

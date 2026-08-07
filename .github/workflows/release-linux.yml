@@ -1,0 +1,65 @@
+# Builds the Linux release of ZipClip on a native Linux runner and
+# publishes it to the website bucket when a v* tag is pushed.
+# Independent of the Windows and website deployments by design.
+#
+# Publish rules (do not change casually, the site links depend on them):
+#   bucket: gozipclip.com-825a66c84550b1da (us-east-2, public read)
+#   key:    downloads/zipclip-linux-amd64.tar.gz (application/gzip)
+#   cache:  max-age=3600
+# Only ever write under downloads/. Every other key belongs to the
+# website deploy workflow and its delete pass. Never publish debug
+# builds or config files: the bucket is world-readable.
+#
+# One-time AWS setup (personal account), shared with the Windows
+# release workflow:
+#   1. IAM > Identity providers > add the GitHub OIDC provider
+#      (token.actions.githubusercontent.com).
+#   2. Create a role trusted by that provider, with the trust policy
+#      condition sub = repo:thesimpledev/goZipClip:ref:refs/tags/v*
+#   3. Give it one permission: s3:PutObject on
+#      arn:aws:s3:::gozipclip.com-825a66c84550b1da/downloads/*
+#   4. Store the role ARN as the repository secret AWS_RELEASE_ROLE_ARN.
+
+name: Release Linux
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: desktop/go.mod
+      - name: Install Fyne build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libgl1-mesa-dev libegl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
+      - name: Test
+        working-directory: desktop
+        run: go test ./... -race -vet=all -shuffle=on -count=1
+      - name: Build
+        working-directory: desktop
+        run: go build -trimpath -o zipclip .
+      - name: Package
+        run: tar -czf zipclip-linux-amd64.tar.gz -C desktop zipclip LICENSE README.md
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_RELEASE_ROLE_ARN }}
+          aws-region: us-east-2
+      - name: Upload to website bucket
+        run: >
+          aws s3api put-object
+          --bucket gozipclip.com-825a66c84550b1da
+          --key downloads/zipclip-linux-amd64.tar.gz
+          --body zipclip-linux-amd64.tar.gz
+          --content-type application/gzip
+          --cache-control "max-age=3600"
