@@ -22,36 +22,106 @@ upload-ready file, automatically:
 Website: https://gozipclip.com
 Created by TheSimpleDev: https://thesimpledev.com
 
-## Requirements
+## Setup guide
 
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp)
-- [ffmpeg](https://ffmpeg.org) (includes ffprobe)
-- A Twitch application (free): https://dev.twitch.tv/console/apps
-  Register an app, set the OAuth redirect to `http://localhost`, and copy the
-  client ID and client secret into ZipClip's Settings tab. These credentials
-  can only read public data (is the channel live), nothing more.
+### 1. Install yt-dlp and ffmpeg
 
-Point the Settings tab at the yt-dlp and ffmpeg executables if they are not
-on your PATH.
+ZipClip drives two well-known free tools: yt-dlp downloads the VODs and
+ffmpeg does the video work (ffprobe comes with it). ZipClip does not bundle
+them, because yt-dlp needs regular updates to keep up with Twitch.
 
-## First run
+- Windows: `winget install yt-dlp.yt-dlp Gyan.FFmpeg`
+- Arch Linux: `sudo pacman -S yt-dlp ffmpeg`
+- Debian/Ubuntu: `sudo apt install yt-dlp ffmpeg`
 
-1. Start ZipClip. It opens on the Settings tab.
-2. Fill in the channel name, Twitch credentials, folders, and intro file,
-   then press Save.
-3. Press "Mark existing VODs as downloaded". This records every VOD already
-   on the channel so ZipClip never downloads your back catalog. Only VODs
-   published after this point are processed.
-4. Leave Automatic mode off for the first few runs. After each detection,
-   the Approve tab shows a preview frame at the detected cut point; adjust
-   the time if needed and press Approve. Nothing is deleted in manual mode.
-5. After the first VOD has downloaded, press "Prepare intro" in Settings.
-   This re-encodes your intro to exactly match the VOD's codec, resolution,
-   and framerate, which is what makes the no-re-encode splice possible. The
-   intro must have an audio track.
-6. Once detection has proven itself, turn on Automatic mode. From then on
-   ZipClip splices without asking and deletes the raw VOD after the output
-   file passes verification.
+If they end up on your PATH (the commands above do that), ZipClip finds
+them automatically. Otherwise note where they are for step 4.
+
+### 2. Create a Twitch application (free)
+
+ZipClip needs Twitch API credentials for exactly one question: is the
+channel live right now. The credentials can only read public data.
+
+1. Go to https://dev.twitch.tv/console/apps and log in with your Twitch
+   account. Twitch may ask you to enable two-factor authentication first.
+2. Press "Register Your Application".
+3. Name: anything, for example `ZipClip`.
+4. OAuth Redirect URL: `http://localhost` (ZipClip never uses it, but the
+   field is required).
+5. Category: Application Integration. Press Create.
+6. Press "Manage" on the new application. Copy the Client ID, then press
+   "New Secret" and copy the Client Secret. The secret is shown only once;
+   if you lose it, generate a new one.
+
+### 3. Install ZipClip
+
+Download the build for your system from https://gozipclip.com and unpack it
+into a folder of your choice. ZipClip keeps its settings (`config.json`)
+and log next to the executable, so pick a folder you can write to, not
+`Program Files`. Building from source is described below.
+
+### 4. First launch
+
+Start ZipClip. It opens on the Settings tab. Fill in:
+
+- **Channel**: the Twitch channel name as it appears in the URL.
+- **Twitch client ID / client secret**: from step 2.
+- **Daily run time**: when the daily check runs, 24-hour clock, for
+  example `08:00`. Pick a time the stream is normally over.
+- **Intro file**: the video spliced onto the front of every VOD. It must
+  have an audio track.
+- **Output folder**: where finished videos land. Point your upload tool's
+  watch folder here.
+- **Work folder**: scratch space for downloads. Needs room for a full VOD
+  (often 5 to 15 GB).
+- **yt-dlp / ffmpeg / ffprobe paths**: leave as-is if they are on PATH,
+  otherwise browse to the executables from step 1.
+- Leave **Automatic mode** off for now.
+
+Press Save.
+
+### 5. Skip your back catalog
+
+Press "Mark existing VODs as downloaded". This records every VOD currently
+on the channel as already handled, so ZipClip never downloads your history.
+Only VODs published after this point are processed. Skip this step only if
+you really want the newest existing VODs pulled down on the first run.
+
+### 6. First runs, with approval
+
+Press "Run now" on the Status tab (or wait for the scheduled time). After
+the download, ZipClip detects where the real stream starts and stops on
+the Approve tab: a preview frame at the detected cut point, and the
+timestamp next to it. Check the frame, adjust the time and press "Preview
+at time" if it is off, then press "Approve and splice". In this mode
+nothing is ever deleted; the Cleanup tab lists what can go, and deletes
+only when you press the button.
+
+### 7. Prepare the intro
+
+Once the first VOD has downloaded, press "Prepare intro" in Settings. This
+re-encodes your intro to exactly match the VOD's codec, resolution, and
+framerate, which is what lets ZipClip splice without re-encoding hours of
+video. Do this once, and again whenever you change the intro file or your
+stream output settings.
+
+### 8. Turn on automatic mode
+
+After a few streams of the detection landing where you expect, turn on
+Automatic mode in Settings. From then on the whole chain runs unattended:
+download, detect, splice, verify, and delete the large intermediate files.
+The finished video still only leaves your machine when your upload tool
+picks it up.
+
+### 9. Start ZipClip with your computer
+
+- **Windows**: press Win+R, run `shell:startup`, and put a shortcut to
+  `zipclip.exe` there.
+- **Linux**: create `~/.config/autostart/zipclip.desktop` with
+  `Exec=/path/to/zipclip`.
+
+ZipClip minimizes to the system tray; closing the window hides it, and the
+tray menu has Run now, Pause, and Quit.
 
 ## Settings notes
 
@@ -85,13 +155,6 @@ After splicing, ZipClip compares the output's duration against intro plus
 trimmed VOD. If they disagree by more than a few seconds, nothing is
 deleted and the run stops with an error, because Twitch keeps a VOD for
 only about 14 days and the raw download is the only re-download window.
-
-## Autostart
-
-- **Windows**: press Win+R, run `shell:startup`, and put a shortcut to
-  `zipclip.exe` there.
-- **Linux**: create `~/.config/autostart/zipclip.desktop` with
-  `Exec=/path/to/zipclip`.
 
 ## Building from source
 

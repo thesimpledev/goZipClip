@@ -49,8 +49,9 @@ your PATH):
 - Debian/Ubuntu: `sudo apt install yt-dlp ffmpeg`
 
 You also need a free Twitch application (client ID and secret) so ZipClip
-can ask whether the channel is live. Setup steps are in
-[desktop/README.md](desktop/README.md).
+can ask whether the channel is live. The full step-by-step setup guide,
+from installing the tools to turning on automatic mode, is in
+[desktop/README.md](desktop/README.md) under "Setup guide".
 
 ## Repository layout
 
