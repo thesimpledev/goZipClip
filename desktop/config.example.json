@@ -1,0 +1,17 @@
+{
+  "channel": "example-channel",
+  "twitchClientId": "your-twitch-client-id",
+  "twitchClientSecret": "your-twitch-client-secret",
+  "dailyRunTime": "08:00",
+  "scanWindowMinutes": 30,
+  "sceneThreshold": 0.4,
+  "cutBackoffSeconds": 5,
+  "introFile": "C:/videos/intro.mp4",
+  "outputDir": "C:/videos/upload",
+  "workDir": "C:/videos/work",
+  "ytdlpPath": "yt-dlp",
+  "ffmpegPath": "ffmpeg",
+  "ffprobePath": "ffprobe",
+  "automaticMode": false,
+  "keepFinalDays": 3
+}

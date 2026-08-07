@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "created_at": "2026-08-07T04:15:06.364070976Z",
+  "capslock_version": "v0.3.2",
+  "goos": "linux",
+  "goarch": "amd64",
+  "gosum_sha256": "596545cf25af548c908739b0e311d3c0bb7b1375b98bb5371711ee4f7c84740a",
+  "capabilities": {
+    "github.com/thesimpledev/sil/desktop": [
+      "ARBITRARY_EXECUTION",
+      "CGO",
+      "EXEC",
+      "FILES",
+      "MODIFY_SYSTEM_STATE",
+      "NETWORK",
+      "READ_SYSTEM_STATE",
+      "REFLECT",
+      "RUNTIME",
+      "SYSTEM_CALLS",
+      "UNANALYZED",
+      "UNSAFE_POINTER"
+    ]
+  }
+}

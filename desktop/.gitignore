@@ -1,0 +1,7 @@
+config.json
+*.log
+goaudit-report.json
+/zipclip
+zipclip.exe
+/desktop
+desktop.exe
