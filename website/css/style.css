@@ -448,6 +448,83 @@ kbd {
     font-size: 0.875rem;
 }
 
+/* Command blocks */
+.legal pre {
+    background: var(--bg-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    overflow-x: auto;
+    margin-bottom: 0.75rem;
+}
+
+.legal pre code {
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+/* OS tabs (no JavaScript: hidden radios drive which panel shows) */
+.os-tabs {
+    margin-bottom: 1rem;
+}
+
+.os-tabs input[type="radio"] {
+    display: none;
+}
+
+.os-tab-labels {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.75rem;
+}
+
+.os-tab-labels label {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.os-tab-labels label:hover {
+    color: var(--text);
+}
+
+.os-tabs section.os-tab-panel {
+    display: none;
+}
+
+.os-tabs input:nth-of-type(1):checked ~ .os-tab-labels label:nth-child(1),
+.os-tabs input:nth-of-type(2):checked ~ .os-tab-labels label:nth-child(2),
+.os-tabs input:nth-of-type(3):checked ~ .os-tab-labels label:nth-child(3) {
+    color: var(--text);
+    background: var(--bg-light);
+    border-color: var(--border);
+}
+
+.os-tabs input:nth-of-type(1):checked ~ section.os-tab-panel:nth-of-type(1),
+.os-tabs input:nth-of-type(2):checked ~ section.os-tab-panel:nth-of-type(2),
+.os-tabs input:nth-of-type(3):checked ~ section.os-tab-panel:nth-of-type(3) {
+    display: block;
+}
+
+/* Download buttons inside the setup guide */
+.inline-downloads {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+}
+
+.inline-downloads .version {
+    text-align: center;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
     .feature-grid {

@@ -110,11 +110,12 @@ func (u *UI) buildStatusPane() fyne.CanvasObject {
 	u.logLabel = widget.NewLabel("")
 	u.logLabel.Wrapping = fyne.TextWrapWord
 	runButton := widget.NewButton("Run now", u.sched.RunNow)
+	runLatestButton := widget.NewButton("Run latest VOD", u.onRunLatest)
 	u.pauseButton = widget.NewButton("Pause", func() { _ = u.sched.TogglePause() })
 	top := container.NewVBox(
 		u.stateLabel,
 		u.nextRunLabel,
-		container.NewHBox(runButton, u.pauseButton),
+		container.NewHBox(runButton, runLatestButton, u.pauseButton),
 		widget.NewSeparator(),
 	)
 	return container.NewBorder(top, nil, nil, nil, container.NewVScroll(u.logLabel))
@@ -129,7 +130,7 @@ func (u *UI) refreshStatus() {
 	u.stateLabel.SetText(text)
 	next := "next run: not scheduled yet"
 	if !u.sched.Next().IsZero() {
-		next = "next run: " + u.sched.Next().Format("Mon 15:04")
+		next = "next run: " + u.sched.Next().Format("Mon 3:04 PM")
 	}
 	if u.sched.Paused() {
 		next = "paused"
@@ -148,6 +149,40 @@ func (u *UI) refreshLog() {
 		start = len(lines) - 50
 	}
 	u.logLabel.SetText(strings.Join(lines[start:], "\n"))
+}
+
+// onRunLatest downloads and processes the newest VOD on the channel,
+// warning first when the archive already lists it as handled.
+func (u *UI) onRunLatest() {
+	cfg := u.store.Get()
+	go func() {
+		id, idErr := LatestVODID(context.Background(), cfg, u.logger.Logf)
+		if idErr != nil {
+			fyne.Do(func() { dialog.ShowError(idErr, u.window) })
+			return
+		}
+		if !IsArchived(id) {
+			u.runLatest()
+			return
+		}
+		fyne.Do(func() {
+			message := "The latest VOD is already marked as handled. Run it again anyway?"
+			dialog.NewConfirm("Run latest VOD", message, func(confirmed bool) {
+				if confirmed {
+					u.runLatest()
+				}
+			}, u.window).Show()
+		})
+	}()
+}
+
+// runLatest runs the pipeline on the newest VOD and surfaces errors.
+func (u *UI) runLatest() {
+	go func() {
+		if runErr := u.pipe.RunLatest(context.Background()); runErr != nil {
+			fyne.Do(func() { dialog.ShowError(runErr, u.window) })
+		}
+	}()
 }
 
 func (u *UI) buildApprovePane() fyne.CanvasObject {

@@ -49,7 +49,7 @@ func TestLoadConfigKeepsDefaultsForMissingFields(t *testing.T) {
 	if got.Channel != "example-channel" {
 		t.Fatalf("channel not read: %+v", got)
 	}
-	if got.DailyRunTime != "08:00" || got.ScanWindowMinutes != 30 {
+	if got.DailyRunTime != "8:00 AM" || got.ScanWindowMinutes != 30 {
 		t.Fatalf("defaults not kept: %+v", got)
 	}
 }
@@ -98,8 +98,6 @@ func validTestConfig(t *testing.T) Config {
 	}
 	cfg := DefaultConfig()
 	cfg.Channel = "example-channel"
-	cfg.TwitchClientID = "example-client-id"
-	cfg.TwitchClientSecret = "example-secret"
 	cfg.IntroFile = intro
 	cfg.OutputDir = base
 	cfg.WorkDir = base

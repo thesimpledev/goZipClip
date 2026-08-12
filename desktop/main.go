@@ -11,13 +11,13 @@ import (
 )
 
 func main() {
-	exeDir := executableDir()
-	logger, logErr := NewLogger(filepath.Join(exeDir, "zipclip.log"))
+	appDir := configDir()
+	logger, logErr := NewLogger(filepath.Join(appDir, "zipclip.log"))
 	if logErr != nil {
 		// A stderr write failure at startup is not actionable.
 		_, _ = fmt.Fprintln(os.Stderr, "log file unavailable:", logErr)
 	}
-	cfgPath := filepath.Join(exeDir, "config.json")
+	cfgPath := filepath.Join(appDir, "config.json")
 	cfg := DefaultConfig()
 	if loaded, loadErr := LoadConfig(cfgPath); loadErr == nil {
 		cfg = loaded
@@ -42,4 +42,19 @@ func executableDir() string {
 		return "."
 	}
 	return filepath.Dir(exe)
+}
+
+// configDir returns the per-user folder where ZipClip keeps its
+// settings and log, creating it if needed. It falls back to the
+// executable's folder when no user config directory is available.
+func configDir() string {
+	base, baseErr := os.UserConfigDir()
+	if baseErr != nil {
+		return executableDir()
+	}
+	dir := filepath.Join(base, "zipclip")
+	if mkErr := os.MkdirAll(dir, 0o700); mkErr != nil {
+		return executableDir()
+	}
+	return dir
 }

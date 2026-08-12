@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setup Guide - ZipClip</title>
-    <meta name="description" content="Step-by-step ZipClip setup: install yt-dlp and ffmpeg, create a Twitch application, configure the app, and turn on automatic VOD processing.">
-    <link rel="stylesheet" href="css/style.css?v=3">
+    <meta name="description" content="Step-by-step ZipClip setup: install yt-dlp and ffmpeg, configure the app, and let it process your VODs automatically.">
+    <link rel="stylesheet" href="css/style.css?v=4">
     <link rel="icon" href="images/favicon.png?v=1" type="image/png">
 </head>
 <body>
@@ -37,78 +37,106 @@
     <main>
         <section class="hero">
             <h1>Setup Guide</h1>
-            <p>From a fresh install to fully automatic VOD processing, in nine steps. Nothing here requires more than a few minutes.</p>
+            <p>From a fresh install to automatic VOD processing, in six steps. Nothing here requires more than a few minutes.</p>
         </section>
 
         <div class="legal">
             <h2>1. Install yt-dlp and ffmpeg</h2>
             <p>ZipClip drives two well-known free tools: yt-dlp downloads the VODs and ffmpeg does the video work (ffprobe comes with it). ZipClip does not bundle them, because yt-dlp needs regular updates to keep up with Twitch.</p>
-            <ul>
-                <li><strong>Windows:</strong> <code>winget install yt-dlp.yt-dlp Gyan.FFmpeg</code></li>
-                <li><strong>Arch Linux:</strong> <code>sudo pacman -S yt-dlp ffmpeg</code></li>
-                <li><strong>Debian/Ubuntu:</strong> <code>sudo apt install yt-dlp ffmpeg</code></li>
-            </ul>
-            <p>If they end up on your PATH (the commands above do that), ZipClip finds them automatically. Otherwise note where they are for step 4.</p>
+            <div class="os-tabs">
+                <input type="radio" name="tools-os" id="tools-windows" checked>
+                <input type="radio" name="tools-os" id="tools-arch">
+                <input type="radio" name="tools-os" id="tools-debian">
+                <div class="os-tab-labels">
+                    <label for="tools-windows">Windows</label>
+                    <label for="tools-arch">Arch Linux</label>
+                    <label for="tools-debian">Debian / Ubuntu</label>
+                </div>
+                <section class="os-tab-panel">
+                    <p>Open PowerShell: press the <kbd>Start</kbd> button, type <code>powershell</code>, and press <kbd>Enter</kbd>. A blue window with a text prompt opens. Type each command below into it, pressing <kbd>Enter</kbd> after each one, and let the first finish before starting the second.</p>
+                    <p>Install yt-dlp (<a href="https://github.com/yt-dlp/yt-dlp/releases" target="_blank" rel="noopener noreferrer">direct download</a>):</p>
+                    <pre><code>winget install yt-dlp.yt-dlp</code></pre>
+                    <p>Install ffmpeg (<a href="https://www.gyan.dev/ffmpeg/builds/" target="_blank" rel="noopener noreferrer">direct download</a>):</p>
+                    <pre><code>winget install Gyan.FFmpeg</code></pre>
+                </section>
+                <section class="os-tab-panel">
+                    <p>Install yt-dlp (<a href="https://github.com/yt-dlp/yt-dlp/releases" target="_blank" rel="noopener noreferrer">direct download</a>):</p>
+                    <pre><code>sudo pacman -S yt-dlp</code></pre>
+                    <p>Install ffmpeg (<a href="https://ffmpeg.org/download.html" target="_blank" rel="noopener noreferrer">direct download</a>):</p>
+                    <pre><code>sudo pacman -S ffmpeg</code></pre>
+                </section>
+                <section class="os-tab-panel">
+                    <p>Install yt-dlp (<a href="https://github.com/yt-dlp/yt-dlp/releases" target="_blank" rel="noopener noreferrer">direct download</a>):</p>
+                    <pre><code>sudo apt install yt-dlp</code></pre>
+                    <p>Install ffmpeg (<a href="https://ffmpeg.org/download.html" target="_blank" rel="noopener noreferrer">direct download</a>):</p>
+                    <pre><code>sudo apt install ffmpeg</code></pre>
+                </section>
+            </div>
+            <p>If they end up on your PATH (the commands above do that), ZipClip finds them automatically. Otherwise note where they are for step 3.</p>
 
-            <h2>2. Create a Twitch application (free)</h2>
-            <p>ZipClip needs Twitch API credentials for exactly one question: is the channel live right now. The credentials can only read public data.</p>
-            <ol>
-                <li>Go to <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noopener noreferrer">dev.twitch.tv/console/apps</a> and log in with your Twitch account. Twitch may ask you to enable two-factor authentication first.</li>
-                <li>Press "Register Your Application".</li>
-                <li>Name: anything, for example <code>ZipClip</code>.</li>
-                <li>OAuth Redirect URL: <code>http://localhost</code> (ZipClip never uses it, but the field is required).</li>
-                <li>Category: Application Integration. Press Create.</li>
-                <li>Press "Manage" on the new application. Copy the Client ID, then press "New Secret" and copy the Client Secret. The secret is shown only once; if you lose it, generate a new one.</li>
-            </ol>
+            <h2>2. Install ZipClip</h2>
+            <div class="inline-downloads">
+                <div>
+                    <a href="/downloads/zipclip-windows-amd64.zip" class="download-btn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Download for Windows
+                    </a>
+                    <span class="version">0.2.0 alpha, x86-64, .zip</span>
+                </div>
+                <div>
+                    <a href="/downloads/zipclip-linux-amd64.tar.gz" class="download-btn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Download for Linux
+                    </a>
+                    <span class="version">0.2.0 alpha, x86-64, .tar.gz</span>
+                </div>
+            </div>
+            <p>Unpack the download into a folder of your choice. ZipClip keeps its settings (<code>config.json</code>), log, and download archive in your user configuration folder (Windows: <code>%AppData%\zipclip</code>, Linux: <code>~/.config/zipclip</code>), so the program itself can live anywhere.</p>
 
-            <h2>3. Install ZipClip</h2>
-            <p>Download the build for your system from the <a href="/#download">download section</a> and unpack it into a folder of your choice. ZipClip keeps its settings (<code>config.json</code>) and log next to the executable, so pick a folder you can write to, not <code>Program Files</code>.</p>
-
-            <h2>4. First launch</h2>
+            <h2>3. First launch</h2>
             <p>Start ZipClip. It opens on the Settings tab. Fill in:</p>
             <ul>
                 <li><strong>Channel:</strong> the Twitch channel name as it appears in the URL.</li>
-                <li><strong>Twitch client ID / client secret:</strong> from step 2.</li>
-                <li><strong>Daily run time:</strong> when the daily check runs, 24-hour clock, for example <code>08:00</code>. Pick a time the stream is normally over.</li>
+                <li><strong>Daily run time:</strong> when the daily check runs, 12-hour clock, for example <code>8:00 AM</code>. Pick a time the stream is normally over.</li>
                 <li><strong>Intro file:</strong> the video spliced onto the front of every VOD. It must have an audio track.</li>
                 <li><strong>Output folder:</strong> where finished videos land. Point your upload tool's watch folder here.</li>
                 <li><strong>Work folder:</strong> scratch space for downloads. Needs room for a full VOD (often 5 to 15 GB).</li>
                 <li><strong>yt-dlp / ffmpeg / ffprobe paths:</strong> leave as-is if they are on PATH, otherwise browse to the executables from step 1.</li>
-                <li>Leave <strong>Automatic mode</strong> off for now.</li>
             </ul>
             <p>Press Save.</p>
 
-            <h2>5. Skip your back catalog</h2>
+            <h2>4. Skip your back catalog</h2>
             <p>Press "Mark existing VODs as downloaded". This records every VOD currently on the channel as already handled, so ZipClip never downloads your history. Only VODs published after this point are processed. Skip this step only if you really want the newest existing VODs pulled down on the first run.</p>
 
-            <h2>6. First runs, with approval</h2>
-            <p>Press "Run now" on the Status tab (or wait for the scheduled time). After the download, ZipClip detects where the real stream starts and stops on the Approve tab: a preview frame at the detected cut point, and the timestamp next to it. Check the frame, adjust the time and press "Preview at time" if it is off, then press "Approve and splice". In this mode nothing is ever deleted; the Cleanup tab lists what can go, and deletes only when you press the button.</p>
+            <h2>5. First run</h2>
+            <p>Press "Run now" on the Status tab, or wait for the scheduled time. The whole chain runs unattended: download, detect where the real stream starts, cut, splice, verify, and delete the large intermediate files. The finished video only leaves your machine when your upload tool picks it up.</p>
+            <p>To try ZipClip on a stream that is already over, press "Run latest VOD". It downloads and processes the newest VOD on the channel even if it was already marked as handled; ZipClip warns you first in that case.</p>
 
-            <h2>7. Prepare the intro</h2>
+            <h2>6. Prepare the intro</h2>
             <p>Once the first VOD has downloaded, press "Prepare intro" in Settings. This re-encodes your intro to exactly match the VOD's codec, resolution, and framerate, which is what lets ZipClip splice without re-encoding hours of video. Do this once, and again whenever you change the intro file or your stream output settings.</p>
-
-            <h2>8. Turn on automatic mode</h2>
-            <p>After a few streams of the detection landing where you expect, turn on Automatic mode in Settings. From then on the whole chain runs unattended: download, detect, splice, verify, and delete the large intermediate files. The finished video still only leaves your machine when your upload tool picks it up.</p>
-
-            <h2>9. Start ZipClip with your computer</h2>
-            <ul>
-                <li><strong>Windows:</strong> press <kbd>Win</kbd>+<kbd>R</kbd>, run <code>shell:startup</code>, and put a shortcut to <code>zipclip.exe</code> there.</li>
-                <li><strong>Linux:</strong> create <code>~/.config/autostart/zipclip.desktop</code> with <code>Exec=/path/to/zipclip</code>.</li>
-            </ul>
             <p>ZipClip minimizes to the system tray; closing the window hides it, and the tray menu has Run now, Pause, and Quit.</p>
 
             <h2>Settings notes</h2>
             <ul>
-                <li><strong>Daily run time:</strong> 24-hour clock, for example <code>08:00</code>.</li>
+                <li><strong>Daily run time:</strong> 12-hour clock, for example <code>8:00 AM</code> or <code>10:30 PM</code>.</li>
                 <li><strong>Scene threshold:</strong> fraction of the picture that must change in one frame step to count as the stream starting. <code>0.4</code> works for a mostly static waiting screen. If detection fires too early (an alert popup, a busy animation), raise it; if it never fires, lower it.</li>
                 <li><strong>Cut backoff:</strong> seconds subtracted from the detected point so the cut lands just before the stream starts. Also absorbs the keyframe snap from stream copying.</li>
                 <li><strong>Keep finished (days):</strong> finished files older than this become cleanup candidates.</li>
-                <li>The Twitch client secret is stored as plain text in <code>config.json</code> next to the executable. It grants only public reads, but treat the file accordingly.</li>
-                <li><code>config.json</code> is plain JSON and can also be edited by hand while ZipClip is not running.</li>
+                <li><strong>Dev mode:</strong> runs step by step. Each run stops on the Approve tab with a preview frame at the detected cut point; check the frame, adjust the time and press "Preview at time" if it is off, then press "Approve and splice". Intermediate files are kept and the Cleanup tab deletes them only when you press the button. Leave this off for normal use.</li>
+                <li><strong>Reset settings</strong> puts every setting back to its default. <strong>Reset archive</strong> deletes the download archive, so every VOD still on the channel counts as new again.</li>
+                <li><code>config.json</code> is plain JSON and can also be edited by hand while ZipClip is not running. It lives in your user configuration folder (Windows: <code>%AppData%\zipclip</code>, Linux: <code>~/.config/zipclip</code>).</li>
             </ul>
 
             <h2>What is never deleted</h2>
-            <p>The download archive (<code>archive.txt</code> in the work folder) is the permanent record of which VODs were already handled. Cleanup never touches it, and it should never be deleted by hand; without it every VOD still on the channel would be downloaded again. The prepared intro (<code>intro_ready.mp4</code>) is also kept.</p>
+            <p>The download archive (<code>archive.txt</code> in the user configuration folder) is the permanent record of which VODs were already handled. Cleanup never touches it; deleting it by hand or with "Reset archive" means every VOD still on the channel counts as new again. The prepared intro (<code>intro_ready.mp4</code>) is also kept.</p>
 
             <h2>Verification before deletion</h2>
             <p>After splicing, ZipClip compares the output's duration against intro plus trimmed VOD. If they disagree by more than a few seconds, nothing is deleted and the run stops with an error, because Twitch keeps a VOD for only about 14 days and the raw download is the only re-download window.</p>

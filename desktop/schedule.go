@@ -4,19 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
 
-// NextRun returns the next occurrence of the daily run time hhmm
-// strictly after now, in now's location.
-func NextRun(now time.Time, hhmm string) (time.Time, error) {
-	if hhmm == "" {
+// NextRun returns the next occurrence of the daily run time strictly
+// after now, in now's location.
+func NextRun(now time.Time, runTime string) (time.Time, error) {
+	if runTime == "" {
 		return time.Time{}, errors.New("run time is empty")
 	}
-	at, parseErr := time.Parse("15:04", hhmm)
+	at, parseErr := parseRunTime(runTime)
 	if parseErr != nil {
-		return time.Time{}, fmt.Errorf("bad run time %q: %w", hhmm, parseErr)
+		return time.Time{}, parseErr
 	}
 	next := time.Date(now.Year(), now.Month(), now.Day(), at.Hour(), at.Minute(), 0, 0, now.Location())
 	if !next.After(now) {
@@ -25,9 +26,17 @@ func NextRun(now time.Time, hhmm string) (time.Time, error) {
 	return next, nil
 }
 
-// Scheduler fires the pipeline at the configured daily time, on
-// demand through RunNow, and an hour later when a run was postponed
-// because the channel was still live.
+// parseRunTime parses a 12-hour clock time like "8:00 PM".
+func parseRunTime(value string) (time.Time, error) {
+	at, parseErr := time.Parse("3:04 PM", strings.ToUpper(strings.TrimSpace(value)))
+	if parseErr != nil {
+		return time.Time{}, fmt.Errorf("bad run time %q, use a 12-hour time like 8:00 PM", value)
+	}
+	return at, nil
+}
+
+// Scheduler fires the pipeline at the configured daily time and on
+// demand through RunNow.
 type Scheduler struct {
 	store  *ConfigStore
 	logger *Logger
@@ -37,7 +46,6 @@ type Scheduler struct {
 	mu       sync.Mutex
 	paused   bool
 	next     time.Time
-	retryAt  time.Time
 	onChange func()
 }
 
@@ -93,9 +101,6 @@ func (s *Scheduler) untilNext(now time.Time) time.Duration {
 		daily = now.Add(time.Hour)
 	}
 	s.mu.Lock()
-	if !s.retryAt.IsZero() && s.retryAt.Before(daily) {
-		daily = s.retryAt
-	}
 	s.next = daily
 	s.mu.Unlock()
 	s.notify()
@@ -104,22 +109,13 @@ func (s *Scheduler) untilNext(now time.Time) time.Duration {
 
 func (s *Scheduler) fire(ctx context.Context, manual bool) {
 	s.mu.Lock()
-	s.retryAt = time.Time{}
 	paused := s.paused
 	s.mu.Unlock()
 	if paused && !manual {
 		s.logger.Logf("scheduled run skipped: paused")
 		return
 	}
-	runErr := s.pipe.Run(ctx)
-	if errors.Is(runErr, ErrChannelLive) {
-		s.mu.Lock()
-		s.retryAt = time.Now().Add(time.Hour)
-		s.mu.Unlock()
-		s.logger.Logf("channel is live, trying again in an hour")
-		return
-	}
-	if runErr != nil {
+	if runErr := s.pipe.Run(ctx); runErr != nil {
 		s.logger.Logf("run failed: %v", runErr)
 	}
 }

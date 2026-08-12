@@ -10,17 +10,12 @@ import (
 	"sync"
 )
 
-// ErrChannelLive signals that the run was postponed because the
-// channel is still streaming; the scheduler retries in an hour.
-var ErrChannelLive = errors.New("channel is live")
-
 // State names the pipeline's current activity.
 type State int
 
 // Pipeline states, in rough order of a run.
 const (
 	StateIdle State = iota
-	StateCheckingLive
 	StateDownloading
 	StateDetecting
 	StateAwaitingApproval
@@ -33,8 +28,6 @@ func (s State) String() string {
 	switch s {
 	case StateIdle:
 		return "idle"
-	case StateCheckingLive:
-		return "checking if channel is live"
 	case StateDownloading:
 		return "downloading"
 	case StateDetecting:
@@ -138,8 +131,8 @@ func (p *Pipeline) end() {
 	p.mu.Unlock()
 }
 
-// Run executes one full pass: live check, download, then processing
-// of every new VOD.
+// Run executes one full pass: download, then processing of every new
+// VOD.
 func (p *Pipeline) Run(ctx context.Context) error {
 	if ctx == nil {
 		return errors.New("nil context")
@@ -152,9 +145,6 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	if problems := cfg.Validate(); len(problems) > 0 {
 		p.setState(StateError, "configuration incomplete: "+strings.Join(problems, "; "))
 		return errors.New("configuration incomplete")
-	}
-	if liveErr := p.checkLive(ctx, cfg); liveErr != nil {
-		return liveErr
 	}
 	files, downloadErr := p.download(ctx, cfg)
 	if downloadErr != nil {
@@ -173,18 +163,31 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	return nil
 }
 
-func (p *Pipeline) checkLive(ctx context.Context, cfg Config) error {
-	p.setState(StateCheckingLive, cfg.Channel)
-	client := NewTwitchClient(cfg.TwitchClientID, cfg.TwitchClientSecret)
-	live, liveErr := client.IsLive(ctx, cfg.Channel)
-	if liveErr != nil {
-		p.setState(StateError, liveErr.Error())
-		return liveErr
+// RunLatest downloads and processes the newest VOD on the channel,
+// even when the archive already lists it as handled.
+func (p *Pipeline) RunLatest(ctx context.Context) error {
+	if ctx == nil {
+		return errors.New("nil context")
 	}
-	if live {
-		p.setState(StateIdle, "channel is live, run postponed")
-		return ErrChannelLive
+	if !p.begin() {
+		return errors.New("a run is already in progress")
 	}
+	defer p.end()
+	cfg := p.store.Get()
+	if problems := cfg.Validate(); len(problems) > 0 {
+		p.setState(StateError, "configuration incomplete: "+strings.Join(problems, "; "))
+		return errors.New("configuration incomplete")
+	}
+	p.setState(StateDownloading, "latest VOD on "+cfg.Channel)
+	vod, dlErr := DownloadLatest(ctx, cfg, p.logger.Logf)
+	if dlErr != nil {
+		p.setState(StateError, dlErr.Error())
+		return dlErr
+	}
+	if procErr := p.processOne(ctx, cfg, vod); procErr != nil {
+		return procErr
+	}
+	p.setState(StateIdle, "finished latest VOD")
 	return nil
 }
 
@@ -210,14 +213,14 @@ func (p *Pipeline) processOne(ctx context.Context, cfg Config, vodPath string) e
 		return spliceErr
 	}
 	p.logger.Logf("finished %s", outPath)
-	if cfg.AutomaticMode {
+	if !cfg.DevMode {
 		p.removeIntermediates(cfg, vodPath)
 	}
 	return nil
 }
 
-// resolveCut detects the stream start and, in manual mode, waits for
-// the human to approve or adjust it.
+// resolveCut detects the stream start and, in dev mode, waits for the
+// human to approve or adjust it.
 func (p *Pipeline) resolveCut(ctx context.Context, cfg Config, vodPath string) (float64, error) {
 	p.setState(StateDetecting, filepath.Base(vodPath))
 	cut, detectErr := DetectCut(ctx, cfg, vodPath)
@@ -229,7 +232,7 @@ func (p *Pipeline) resolveCut(ctx context.Context, cfg Config, vodPath string) (
 		p.logger.Logf("preview failed (continuing): %v", prevErr)
 		preview = ""
 	}
-	if cfg.AutomaticMode {
+	if !cfg.DevMode {
 		return cut, nil
 	}
 	return p.waitForApproval(ctx, PendingCut{VodPath: vodPath, Cut: cut, Preview: preview})
@@ -252,7 +255,7 @@ func (p *Pipeline) waitForApproval(ctx context.Context, pending PendingCut) (flo
 	}
 }
 
-// Approve delivers the final cut time to a pipeline waiting in manual
+// Approve delivers the final cut time to a pipeline waiting in dev
 // mode. It reports whether anything was waiting.
 func (p *Pipeline) Approve(cut float64) bool {
 	select {
@@ -311,8 +314,8 @@ func (p *Pipeline) verify(ctx context.Context, cfg Config, introPath, trimmedPat
 }
 
 // removeIntermediates deletes the raw VOD and per-job scratch files
-// once the output has been verified. Only automatic mode calls this;
-// manual mode leaves deletion to the Cleanup pane.
+// once the output has been verified. Dev mode skips this and leaves
+// deletion to the Cleanup pane.
 func (p *Pipeline) removeIntermediates(cfg Config, vodPath string) {
 	targets := []string{
 		vodPath,

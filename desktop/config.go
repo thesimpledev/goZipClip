@@ -6,34 +6,31 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 )
 
 // Config holds every user-adjustable setting. It is persisted as
 // config.json next to the executable and is normally edited through
 // the Settings pane, but it stays hand-editable JSON.
 type Config struct {
-	Channel            string  `json:"channel"`
-	TwitchClientID     string  `json:"twitchClientId"`
-	TwitchClientSecret string  `json:"twitchClientSecret"`
-	DailyRunTime       string  `json:"dailyRunTime"`
-	ScanWindowMinutes  int     `json:"scanWindowMinutes"`
-	SceneThreshold     float64 `json:"sceneThreshold"`
-	CutBackoffSeconds  int     `json:"cutBackoffSeconds"`
-	IntroFile          string  `json:"introFile"`
-	OutputDir          string  `json:"outputDir"`
-	WorkDir            string  `json:"workDir"`
-	YtdlpPath          string  `json:"ytdlpPath"`
-	FfmpegPath         string  `json:"ffmpegPath"`
-	FfprobePath        string  `json:"ffprobePath"`
-	AutomaticMode      bool    `json:"automaticMode"`
-	KeepFinalDays      int     `json:"keepFinalDays"`
+	Channel           string  `json:"channel"`
+	DailyRunTime      string  `json:"dailyRunTime"`
+	ScanWindowMinutes int     `json:"scanWindowMinutes"`
+	SceneThreshold    float64 `json:"sceneThreshold"`
+	CutBackoffSeconds int     `json:"cutBackoffSeconds"`
+	IntroFile         string  `json:"introFile"`
+	OutputDir         string  `json:"outputDir"`
+	WorkDir           string  `json:"workDir"`
+	YtdlpPath         string  `json:"ytdlpPath"`
+	FfmpegPath        string  `json:"ffmpegPath"`
+	FfprobePath       string  `json:"ffprobePath"`
+	DevMode           bool    `json:"devMode"`
+	KeepFinalDays     int     `json:"keepFinalDays"`
 }
 
 // DefaultConfig returns the settings a fresh install starts from.
 func DefaultConfig() Config {
 	return Config{
-		DailyRunTime:      "08:00",
+		DailyRunTime:      "8:00 AM",
 		ScanWindowMinutes: 30,
 		SceneThreshold:    0.4,
 		CutBackoffSeconds: 5,
@@ -87,14 +84,8 @@ func (c Config) validateAccount() []string {
 	if c.Channel == "" {
 		problems = append(problems, "channel is not set")
 	}
-	if c.TwitchClientID == "" {
-		problems = append(problems, "Twitch client ID is not set")
-	}
-	if c.TwitchClientSecret == "" {
-		problems = append(problems, "Twitch client secret is not set")
-	}
-	if _, timeErr := time.Parse("15:04", c.DailyRunTime); timeErr != nil {
-		problems = append(problems, "daily run time must look like 08:00")
+	if _, timeErr := parseRunTime(c.DailyRunTime); timeErr != nil {
+		problems = append(problems, "daily run time must look like 8:00 PM")
 	}
 	return problems
 }

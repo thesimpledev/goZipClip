@@ -1,8 +1,6 @@
 {
   "channel": "example-channel",
-  "twitchClientId": "your-twitch-client-id",
-  "twitchClientSecret": "your-twitch-client-secret",
-  "dailyRunTime": "08:00",
+  "dailyRunTime": "8:00 AM",
   "scanWindowMinutes": 30,
   "sceneThreshold": 0.4,
   "cutBackoffSeconds": 5,
@@ -12,6 +10,6 @@
   "ytdlpPath": "yt-dlp",
   "ffmpegPath": "ffmpeg",
   "ffprobePath": "ffprobe",
-  "automaticMode": false,
+  "devMode": false,
   "keepFinalDays": 3
 }
