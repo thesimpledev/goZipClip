@@ -513,7 +513,13 @@ kbd {
     display: block;
 }
 
-/* Download buttons inside the setup guide */
+/* Download buttons inside the setup guide. The .legal link color
+   would otherwise override the button's white text, leaving cyan on
+   cyan. */
+.legal .download-btn {
+    color: white;
+}
+
 .inline-downloads {
     display: flex;
     gap: 2rem;
