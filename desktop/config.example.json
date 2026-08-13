@@ -11,5 +11,8 @@
   "ffmpegPath": "ffmpeg",
   "ffprobePath": "ffprobe",
   "devMode": false,
-  "keepFinalDays": 3
+  "keepFinalDays": 3,
+  "autoUpload": false,
+  "youtubeClientId": "your-google-oauth-client-id",
+  "youtubeClientSecret": "your-google-oauth-client-secret"
 }

@@ -31,6 +31,9 @@ Once a day, ZipClip:
    re-encode and no quality loss.
 5. Drops the finished file into your output folder and verifies the result
    before anything is deleted.
+6. Uploads the finished video to your YouTube channel as a private video,
+   when automatic uploads are turned on. Otherwise the Status tab lists
+   the files waiting for manual upload.
 
 A small GUI shows status, runs the newest VOD on demand, and cleans up
 the large intermediate files automatically. An optional dev mode runs

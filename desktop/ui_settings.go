@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -29,6 +31,9 @@ type settingsForm struct {
 	ffprobe    *widget.Entry
 	devMode    *widget.Check
 	keepDays   *widget.Entry
+	autoUpload *widget.Check
+	ytClientID *widget.Entry
+	ytSecret   *widget.Entry
 }
 
 func newSettingsForm() *settingsForm {
@@ -46,6 +51,9 @@ func newSettingsForm() *settingsForm {
 		ffprobe:    widget.NewEntry(),
 		devMode:    widget.NewCheck("Run step by step: approve each cut, keep intermediate files", nil),
 		keepDays:   widget.NewEntry(),
+		autoUpload: widget.NewCheck("Upload finished videos to YouTube automatically", nil),
+		ytClientID: widget.NewEntry(),
+		ytSecret:   widget.NewPasswordEntry(),
 	}
 }
 
@@ -63,6 +71,9 @@ func (f *settingsForm) fill(cfg Config) {
 	f.ffprobe.SetText(cfg.FfprobePath)
 	f.devMode.SetChecked(cfg.DevMode)
 	f.keepDays.SetText(strconv.Itoa(cfg.KeepFinalDays))
+	f.autoUpload.SetChecked(cfg.AutoUpload)
+	f.ytClientID.SetText(cfg.YouTubeClientID)
+	f.ytSecret.SetText(cfg.YouTubeClientSecret)
 }
 
 // collect builds a Config from the widgets, reporting the first
@@ -78,6 +89,9 @@ func (f *settingsForm) collect() (Config, error) {
 	cfg.FfmpegPath = strings.TrimSpace(f.ffmpeg.Text)
 	cfg.FfprobePath = strings.TrimSpace(f.ffprobe.Text)
 	cfg.DevMode = f.devMode.Checked
+	cfg.AutoUpload = f.autoUpload.Checked
+	cfg.YouTubeClientID = strings.TrimSpace(f.ytClientID.Text)
+	cfg.YouTubeClientSecret = strings.TrimSpace(f.ytSecret.Text)
 	var numErr error
 	cfg.ScanWindowMinutes, numErr = parseIntField(numErr, "scan window", f.scanWindow.Text)
 	cfg.SceneThreshold, numErr = parseFloatField(numErr, "scene threshold", f.threshold.Text)
@@ -127,11 +141,15 @@ func (u *UI) buildSettingsPane() fyne.CanvasObject {
 		widget.NewFormItem("ffprobe path", u.form.ffprobe),
 		widget.NewFormItem("Dev mode", u.form.devMode),
 		widget.NewFormItem("Keep finished (days)", u.form.keepDays),
+		widget.NewFormItem("Uploads", u.form.autoUpload),
+		widget.NewFormItem("YouTube client ID", u.form.ytClientID),
+		widget.NewFormItem("YouTube client secret", u.form.ytSecret),
 	)
 	buttons := container.NewHBox(
 		widget.NewButton("Save settings", u.onSaveSettings),
 		widget.NewButton("Prepare intro", u.onPrepareIntro),
 		widget.NewButton("Mark existing VODs as downloaded", u.onSeedArchive),
+		widget.NewButton("Connect YouTube", u.onConnectYouTube),
 		widget.NewButton("Reset settings", u.onResetSettings),
 		widget.NewButton("Reset archive", u.onResetArchive),
 	)
@@ -195,6 +213,33 @@ func (u *UI) onPrepareIntro() {
 			}
 			dialog.ShowInformation("Intro ready",
 				"The intro was re-encoded to match the latest VOD.", u.window)
+		})
+	}()
+}
+
+// onConnectYouTube runs the one-time Google authorization with the
+// saved YouTube client credentials, opening the consent page in the
+// user's browser.
+func (u *UI) onConnectYouTube() {
+	cfg := u.store.Get()
+	openURL := func(link string) error {
+		parsed, parseErr := url.Parse(link)
+		if parseErr != nil {
+			return parseErr
+		}
+		return u.fyneApp.OpenURL(parsed)
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		authErr := NewYouTubeClient(cfg).Authorize(ctx, openURL)
+		fyne.Do(func() {
+			if authErr != nil {
+				dialog.ShowError(authErr, u.window)
+				return
+			}
+			dialog.ShowInformation("YouTube connected",
+				"ZipClip can now upload finished videos to your channel.", u.window)
 		})
 	}()
 }

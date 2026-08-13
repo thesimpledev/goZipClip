@@ -37,7 +37,7 @@
     <main>
         <section class="hero">
             <h1>Setup Guide</h1>
-            <p>From a fresh install to automatic VOD processing, in six steps. Nothing here requires more than a few minutes.</p>
+            <p>From a fresh install to automatic VOD processing, in seven steps. Nothing here requires more than a few minutes.</p>
         </section>
 
         <div class="legal">
@@ -113,14 +113,26 @@
             </ul>
             <p>Press Save.</p>
 
-            <h2>4. Skip your back catalog</h2>
+            <h2>4. Set up YouTube uploads (optional)</h2>
+            <p>ZipClip can upload each finished video to your channel by itself. Skip this step if you would rather upload by hand: the "Show files to upload" button on the Status tab lists what is waiting in the output folder.</p>
+            <p>Automatic uploads need a Google OAuth client, created once in your own Google account:</p>
+            <ol>
+                <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer">console.cloud.google.com</a> and sign in with the Google account that owns your YouTube channel. Create a new project; the name does not matter.</li>
+                <li>Under "APIs &amp; Services", open "Library", search for <code>YouTube Data API v3</code>, and press Enable.</li>
+                <li>Under "APIs &amp; Services", open "OAuth consent screen". Choose External, fill in the app name and your email address, and save. Then press "Publish app" so the status is "In production". This matters: while the status is Testing, Google cuts the connection after 7 days and you would have to reconnect weekly.</li>
+                <li>Under "APIs &amp; Services", open "Credentials", press "Create Credentials", pick "OAuth client ID", and choose the "Desktop app" type. Copy the Client ID and Client Secret.</li>
+                <li>In ZipClip's Settings: paste both values, tick "Upload finished videos to YouTube automatically", and press "Save settings". Then press "Connect YouTube". Your browser opens a Google consent page; because this is your own unverified project, Google shows a warning screen first. Continue past it (Advanced, then "Go to ...") and allow the upload permission.</li>
+            </ol>
+            <p>Uploads arrive on your channel as private videos; review and publish them from YouTube Studio. YouTube locks API uploads from unaudited projects to private, so this is also the only mode Google allows a personal project.</p>
+
+            <h2>5. Skip your back catalog</h2>
             <p>Press "Mark existing VODs as downloaded". This records every VOD currently on the channel as already handled, so ZipClip never downloads your history. Only VODs published after this point are processed. Skip this step only if you really want the newest existing VODs pulled down on the first run.</p>
 
-            <h2>5. First run</h2>
-            <p>Press "Run now" on the Status tab, or wait for the scheduled time. The whole chain runs unattended: download, detect where the real stream starts, cut, splice, verify, and delete the large intermediate files. The finished video only leaves your machine when your upload tool picks it up.</p>
+            <h2>6. First run</h2>
+            <p>Press "Run now" on the Status tab, or wait for the scheduled time. The whole chain runs unattended: download, detect where the real stream starts, cut, splice, verify, delete the large intermediate files, and, with automatic uploads on, upload the result to your channel as a private video.</p>
             <p>To try ZipClip on a stream that is already over, press "Run latest VOD". It downloads and processes the newest VOD on the channel even if it was already marked as handled; ZipClip warns you first in that case.</p>
 
-            <h2>6. Prepare the intro</h2>
+            <h2>7. Prepare the intro</h2>
             <p>Once the first VOD has downloaded, press "Prepare intro" in Settings. This re-encodes your intro to exactly match the VOD's codec, resolution, and framerate, which is what lets ZipClip splice without re-encoding hours of video. Do this once, and again whenever you change the intro file or your stream output settings.</p>
             <p>ZipClip minimizes to the system tray; closing the window hides it, and the tray menu has Run now, Pause, and Quit.</p>
 
@@ -131,7 +143,9 @@
                 <li><strong>Cut backoff:</strong> seconds subtracted from the detected point so the cut lands just before the stream starts. Also absorbs the keyframe snap from stream copying.</li>
                 <li><strong>Keep finished (days):</strong> finished files older than this become cleanup candidates.</li>
                 <li><strong>Dev mode:</strong> runs step by step. Each run stops on the Approve tab with a preview frame at the detected cut point; check the frame, adjust the time and press "Preview at time" if it is off, then press "Approve and splice". Intermediate files are kept and the Cleanup tab deletes them only when you press the button. Leave this off for normal use.</li>
+                <li><strong>Uploads:</strong> unchecked means manual mode; use "Show files to upload" on the Status tab and upload however you like. Checked means every finished video is uploaded to your channel as a private video.</li>
                 <li><strong>Reset settings</strong> puts every setting back to its default. <strong>Reset archive</strong> deletes the download archive, so every VOD still on the channel counts as new again.</li>
+                <li>The YouTube client secret and the sign-in token (<code>youtube_token.json</code>) are stored in the user configuration folder. They only grant permission to upload videos to your channel, and you can revoke them any time at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">myaccount.google.com/permissions</a>.</li>
                 <li><code>config.json</code> is plain JSON and can also be edited by hand while ZipClip is not running. It lives in your user configuration folder (Windows: <code>%AppData%\zipclip</code>, Linux: <code>~/.config/zipclip</code>).</li>
             </ul>
 

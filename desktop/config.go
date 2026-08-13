@@ -12,19 +12,22 @@ import (
 // config.json next to the executable and is normally edited through
 // the Settings pane, but it stays hand-editable JSON.
 type Config struct {
-	Channel           string  `json:"channel"`
-	DailyRunTime      string  `json:"dailyRunTime"`
-	ScanWindowMinutes int     `json:"scanWindowMinutes"`
-	SceneThreshold    float64 `json:"sceneThreshold"`
-	CutBackoffSeconds int     `json:"cutBackoffSeconds"`
-	IntroFile         string  `json:"introFile"`
-	OutputDir         string  `json:"outputDir"`
-	WorkDir           string  `json:"workDir"`
-	YtdlpPath         string  `json:"ytdlpPath"`
-	FfmpegPath        string  `json:"ffmpegPath"`
-	FfprobePath       string  `json:"ffprobePath"`
-	DevMode           bool    `json:"devMode"`
-	KeepFinalDays     int     `json:"keepFinalDays"`
+	Channel             string  `json:"channel"`
+	DailyRunTime        string  `json:"dailyRunTime"`
+	ScanWindowMinutes   int     `json:"scanWindowMinutes"`
+	SceneThreshold      float64 `json:"sceneThreshold"`
+	CutBackoffSeconds   int     `json:"cutBackoffSeconds"`
+	IntroFile           string  `json:"introFile"`
+	OutputDir           string  `json:"outputDir"`
+	WorkDir             string  `json:"workDir"`
+	YtdlpPath           string  `json:"ytdlpPath"`
+	FfmpegPath          string  `json:"ffmpegPath"`
+	FfprobePath         string  `json:"ffprobePath"`
+	DevMode             bool    `json:"devMode"`
+	KeepFinalDays       int     `json:"keepFinalDays"`
+	AutoUpload          bool    `json:"autoUpload"`
+	YouTubeClientID     string  `json:"youtubeClientId"`
+	YouTubeClientSecret string  `json:"youtubeClientSecret"`
 }
 
 // DefaultConfig returns the settings a fresh install starts from.
@@ -86,6 +89,14 @@ func (c Config) validateAccount() []string {
 	}
 	if _, timeErr := parseRunTime(c.DailyRunTime); timeErr != nil {
 		problems = append(problems, "daily run time must look like 8:00 PM")
+	}
+	if c.AutoUpload {
+		if c.YouTubeClientID == "" {
+			problems = append(problems, "automatic uploads need a YouTube client ID")
+		}
+		if c.YouTubeClientSecret == "" {
+			problems = append(problems, "automatic uploads need a YouTube client secret")
+		}
 	}
 	return problems
 }

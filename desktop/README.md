@@ -14,8 +14,10 @@ upload-ready file, automatically:
 4. The prestream section is cut off and your intro is spliced onto the front.
    Both steps are stream copies, so a multi-hour VOD is processed in minutes
    without re-encoding.
-5. The finished file lands in the output folder, ready for whatever upload
-   tool watches that folder.
+5. The finished file lands in the output folder. With automatic uploads
+   turned on, ZipClip then uploads it to your YouTube channel as a
+   private video; otherwise the Status tab lists the files waiting for
+   manual upload.
 6. Intermediate files are deleted automatically once the output is
    verified. In dev mode they are kept, listed on the Cleanup tab, and
    deleted only when you press the button.
@@ -81,25 +83,61 @@ Start ZipClip. It opens on the Settings tab. Fill in:
 
 Press Save.
 
-### 4. Skip your back catalog
+### 4. Set up YouTube uploads (optional)
+
+ZipClip can upload each finished video to your channel by itself. Skip
+this step if you would rather upload by hand: the "Show files to
+upload" button on the Status tab lists what is waiting in the output
+folder.
+
+Automatic uploads need a Google OAuth client, created once in your own
+Google account:
+
+1. Go to https://console.cloud.google.com and sign in with the Google
+   account that owns your YouTube channel. Create a new project; the
+   name does not matter.
+2. Under "APIs & Services", open "Library", search for
+   `YouTube Data API v3`, and press Enable.
+3. Under "APIs & Services", open "OAuth consent screen". Choose
+   External, fill in the app name and your email address, and save.
+   Then press "Publish app" so the status is "In production". This
+   matters: while the status is Testing, Google cuts the connection
+   after 7 days and you would have to reconnect weekly.
+4. Under "APIs & Services", open "Credentials", press
+   "Create Credentials", pick "OAuth client ID", and choose the
+   "Desktop app" type. Copy the Client ID and Client Secret.
+5. In ZipClip's Settings: paste both values, tick "Upload finished
+   videos to YouTube automatically", and press "Save settings". Then
+   press "Connect YouTube". Your browser opens a Google consent page;
+   because this is your own unverified project, Google shows a
+   warning screen first. Continue past it (Advanced, then "Go to
+   ...") and allow the upload permission.
+
+Uploads arrive on your channel as private videos; review and publish
+them from YouTube Studio. YouTube locks API uploads from unaudited
+projects to private, so this is also the only mode Google allows a
+personal project.
+
+### 5. Skip your back catalog
 
 Press "Mark existing VODs as downloaded". This records every VOD currently
 on the channel as already handled, so ZipClip never downloads your history.
 Only VODs published after this point are processed. Skip this step only if
 you really want the newest existing VODs pulled down on the first run.
 
-### 5. First run
+### 6. First run
 
 Press "Run now" on the Status tab, or wait for the scheduled time. The
 whole chain runs unattended: download, detect where the real stream
-starts, cut, splice, verify, and delete the large intermediate files. The
-finished video only leaves your machine when your upload tool picks it up.
+starts, cut, splice, verify, delete the large intermediate files, and,
+with automatic uploads on, upload the result to your channel as a
+private video.
 
 To try ZipClip on a stream that is already over, press "Run latest VOD".
 It downloads and processes the newest VOD on the channel even if it was
 already marked as handled; ZipClip warns you first in that case.
 
-### 6. Prepare the intro
+### 7. Prepare the intro
 
 Once the first VOD has downloaded, press "Prepare intro" in Settings. This
 re-encodes your intro to exactly match the VOD's codec, resolution, and
@@ -127,9 +165,16 @@ tray menu has Run now, Pause, and Quit.
   time and press "Preview at time" if it is off, then press "Approve and
   splice". Intermediate files are kept and the Cleanup tab deletes them
   only when you press the button. Leave this off for normal use.
+- **Uploads**: unchecked means manual mode; use "Show files to upload"
+  on the Status tab and upload however you like. Checked means every
+  finished video is uploaded to your channel as a private video.
 - **Reset settings** puts every setting back to its default. **Reset
   archive** deletes the download archive, so every VOD still on the
   channel counts as new again.
+- The YouTube client secret and the sign-in token
+  (`youtube_token.json`) are stored in the user configuration folder.
+  They only grant permission to upload videos to your channel, and you
+  can revoke them any time at https://myaccount.google.com/permissions.
 - `config.json` is plain JSON and can also be edited by hand while ZipClip
   is not running. It lives in your user configuration folder (Windows:
   `%AppData%\zipclip`, Linux: `~/.config/zipclip`).

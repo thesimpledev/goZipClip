@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -111,11 +112,12 @@ func (u *UI) buildStatusPane() fyne.CanvasObject {
 	u.logLabel.Wrapping = fyne.TextWrapWord
 	runButton := widget.NewButton("Run now", u.sched.RunNow)
 	runLatestButton := widget.NewButton("Run latest VOD", u.onRunLatest)
+	showFilesButton := widget.NewButton("Show files to upload", u.onShowUploadFiles)
 	u.pauseButton = widget.NewButton("Pause", func() { _ = u.sched.TogglePause() })
 	top := container.NewVBox(
 		u.stateLabel,
 		u.nextRunLabel,
-		container.NewHBox(runButton, runLatestButton, u.pauseButton),
+		container.NewHBox(runButton, runLatestButton, showFilesButton, u.pauseButton),
 		widget.NewSeparator(),
 	)
 	return container.NewBorder(top, nil, nil, nil, container.NewVScroll(u.logLabel))
@@ -149,6 +151,37 @@ func (u *UI) refreshLog() {
 		start = len(lines) - 50
 	}
 	u.logLabel.SetText(strings.Join(lines[start:], "\n"))
+}
+
+// onShowUploadFiles lists the finished videos sitting in the output
+// folder, for manual uploads.
+func (u *UI) onShowUploadFiles() {
+	cfg := u.store.Get()
+	entries, readErr := os.ReadDir(cfg.OutputDir)
+	if readErr != nil {
+		dialog.ShowError(readErr, u.window)
+		return
+	}
+	var b strings.Builder
+	count := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		count++
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			// The size is decoration; the name still gets listed.
+			_, _ = fmt.Fprintf(&b, "%s\n", entry.Name())
+			continue
+		}
+		_, _ = fmt.Fprintf(&b, "%s (%s)\n", entry.Name(), formatSize(info.Size()))
+	}
+	if count == 0 {
+		dialog.ShowInformation("Files to upload", "The output folder is empty.", u.window)
+		return
+	}
+	dialog.ShowInformation("Files to upload", b.String(), u.window)
 }
 
 // onRunLatest downloads and processes the newest VOD on the channel,

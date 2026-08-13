@@ -21,6 +21,7 @@ const (
 	StateAwaitingApproval
 	StateSplicing
 	StateVerifying
+	StateUploading
 	StateError
 )
 
@@ -38,6 +39,8 @@ func (s State) String() string {
 		return "splicing"
 	case StateVerifying:
 		return "verifying"
+	case StateUploading:
+		return "uploading to YouTube"
 	case StateError:
 		return "error"
 	default:
@@ -216,6 +219,22 @@ func (p *Pipeline) processOne(ctx context.Context, cfg Config, vodPath string) e
 	if !cfg.DevMode {
 		p.removeIntermediates(cfg, vodPath)
 	}
+	if cfg.AutoUpload {
+		return p.upload(ctx, cfg, outPath)
+	}
+	return nil
+}
+
+// upload sends a finished video to YouTube. The output file stays in
+// the output folder either way; a failed upload can be retried with
+// Run latest VOD or uploaded by hand.
+func (p *Pipeline) upload(ctx context.Context, cfg Config, outPath string) error {
+	p.setState(StateUploading, filepath.Base(outPath))
+	if upErr := NewYouTubeClient(cfg).Upload(ctx, outPath); upErr != nil {
+		p.setState(StateError, upErr.Error())
+		return upErr
+	}
+	p.logger.Logf("uploaded %s as a private YouTube video", filepath.Base(outPath))
 	return nil
 }
 
