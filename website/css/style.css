@@ -531,6 +531,68 @@ kbd {
     text-align: center;
 }
 
+/* Collapsible guide sections (no JavaScript: native details/summary) */
+.legal details {
+    background: var(--bg-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.legal summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.legal summary::-webkit-details-marker {
+    display: none;
+}
+
+.legal summary::after {
+    content: "";
+    width: 0.55rem;
+    height: 0.55rem;
+    border-right: 2px solid var(--text-muted);
+    border-bottom: 2px solid var(--text-muted);
+    transform: rotate(45deg);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+.legal details[open] summary::after {
+    transform: rotate(225deg);
+}
+
+.legal details[open] summary {
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+}
+
+.legal details > :last-child:not(summary) {
+    margin-bottom: 1.25rem;
+}
+
+.legal h3 {
+    font-size: 1.05rem;
+    margin: 1.5rem 0 0.5rem;
+}
+
+/* The section cards share the code-block background, so nested code
+   and pre blocks need the page background to stay distinct. */
+.legal details pre,
+.legal details code {
+    background: var(--bg);
+}
+
 /* Responsive */
 @media (max-width: 900px) {
     .feature-grid {
