@@ -61,13 +61,14 @@ type Pipeline struct {
 	store  *ConfigStore
 	logger *Logger
 
-	mu       sync.Mutex
-	state    State
-	detail   string
-	running  bool
-	pending  *PendingCut
-	approve  chan float64
-	onChange func()
+	mu         sync.Mutex
+	state      State
+	detail     string
+	running    bool
+	pending    *PendingCut
+	approve    chan float64
+	onChange   func()
+	toolsReady <-chan struct{}
 }
 
 // NewPipeline wires a pipeline to the shared config and logger.
@@ -81,6 +82,32 @@ func (p *Pipeline) SetOnChange(fn func()) {
 	p.mu.Lock()
 	p.onChange = fn
 	p.mu.Unlock()
+}
+
+// SetToolsReady registers a channel that is closed once the
+// launch-time yt-dlp install or update has finished. Runs wait on it
+// so a download never races the binary being replaced.
+func (p *Pipeline) SetToolsReady(ready <-chan struct{}) {
+	p.mu.Lock()
+	p.toolsReady = ready
+	p.mu.Unlock()
+}
+
+// waitTools blocks until the launch-time binary setup is over, or the
+// run is cancelled.
+func (p *Pipeline) waitTools(ctx context.Context) error {
+	p.mu.Lock()
+	ready := p.toolsReady
+	p.mu.Unlock()
+	if ready == nil {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-ready:
+		return nil
+	}
 }
 
 // Status returns the current state and detail text.
@@ -149,6 +176,9 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		p.setState(StateError, "configuration incomplete: "+strings.Join(problems, "; "))
 		return errors.New("configuration incomplete")
 	}
+	if waitErr := p.waitTools(ctx); waitErr != nil {
+		return waitErr
+	}
 	files, downloadErr := p.download(ctx, cfg)
 	if downloadErr != nil {
 		return downloadErr
@@ -180,6 +210,9 @@ func (p *Pipeline) RunLatest(ctx context.Context) error {
 	if problems := cfg.Validate(); len(problems) > 0 {
 		p.setState(StateError, "configuration incomplete: "+strings.Join(problems, "; "))
 		return errors.New("configuration incomplete")
+	}
+	if waitErr := p.waitTools(ctx); waitErr != nil {
+		return waitErr
 	}
 	p.setState(StateDownloading, "latest VOD on "+cfg.Channel)
 	vod, dlErr := DownloadLatest(ctx, cfg, p.logger.Logf)

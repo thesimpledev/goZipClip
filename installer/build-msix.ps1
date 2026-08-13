@@ -1,8 +1,9 @@
 # Builds the Microsoft Store MSIX from desktop\zipclip.exe.
 # Usage: .\installer\build-msix.ps1 -Version 0.1.0
 #
-# Packs directly with makeappx (no MSI, no capture): ZipClip is a single
-# portable exe, so the package is just the exe, the license, and the
+# Packs directly with makeappx (no MSI, no capture): the package is
+# zipclip.exe, the bundled ffmpeg build from bin\ffmpeg-windows (built
+# by "just ffmpeg", see installer\buildwin), the licenses, and the
 # logo assets generated from desktop\icon.png. makeappx comes from the
 # Microsoft.Windows.SDK.BuildTools NuGet package, auto-downloaded into
 # installer\.tools on first run.
@@ -22,6 +23,12 @@ $root = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $root 'desktop\zipclip.exe'
 if (-not (Test-Path $exe)) {
     throw "Missing $exe - build it first: cd desktop; go build -trimpath -ldflags -H=windowsgui -o zipclip.exe ."
+}
+$ffmpegDist = Join-Path $root 'bin\ffmpeg-windows'
+foreach ($bundled in @('ffmpeg.exe', 'ffprobe.exe', 'FFMPEG_LICENSE.txt')) {
+    if (-not (Test-Path (Join-Path $ffmpegDist $bundled))) {
+        throw "Missing $ffmpegDist\$bundled - build it first: just ffmpeg (runs on Linux, see installer\buildwin)"
+    }
 }
 
 # --- locate or fetch makeappx ---
@@ -49,6 +56,7 @@ New-Item -ItemType Directory -Force "$layout\Assets" | Out-Null
 Copy-Item $exe $layout
 Copy-Item (Join-Path $root 'desktop\LICENSE') $layout
 Copy-Item (Join-Path $root 'desktop\README.md') $layout
+Copy-Item (Join-Path $ffmpegDist '*') $layout
 
 (Get-Content (Join-Path $PSScriptRoot 'AppxManifest.xml') -Raw) -replace '\{\{VERSION\}\}', $msixVersion |
     Set-Content (Join-Path $layout 'AppxManifest.xml') -Encoding utf8

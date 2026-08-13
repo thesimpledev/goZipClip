@@ -57,7 +57,7 @@ func probeParams(ctx context.Context, cfg Config, path string) (mediaParams, err
 		path,
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.FfprobePath, args...)
+	cmd := exec.CommandContext(ctx, resolveFfprobe(cfg), args...)
 	out, runErr := cmd.Output()
 	if runErr != nil {
 		return mediaParams{}, fmt.Errorf("ffprobe %s: %w", filepath.Base(path), runErr)
@@ -146,7 +146,7 @@ func PrepareIntro(ctx context.Context, cfg Config, logf func(string, ...any)) er
 	}
 	out := introReadyPath(cfg)
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.FfmpegPath, prepareArgs(cfg, params, out)...)
+	cmd := exec.CommandContext(ctx, resolveFfmpeg(cfg), prepareArgs(cfg, params, out)...)
 	output, runErr := cmd.CombinedOutput()
 	if runErr != nil {
 		return fmt.Errorf("ffmpeg intro encode: %w: %s", runErr, truncate(string(output), 300))

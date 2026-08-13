@@ -27,7 +27,13 @@ func main() {
 	store := &ConfigStore{}
 	store.Set(cfg)
 	ctx, cancel := context.WithCancel(context.Background())
+	ytdlpReady := make(chan struct{})
+	go func() {
+		EnsureYtdlp(ctx, cfg, logger.Logf)
+		close(ytdlpReady)
+	}()
 	pipe := NewPipeline(store, logger)
+	pipe.SetToolsReady(ytdlpReady)
 	sched := NewScheduler(store, logger, pipe)
 	ui := NewUI(cfgPath, store, logger, pipe, sched)
 	go sched.Loop(ctx)

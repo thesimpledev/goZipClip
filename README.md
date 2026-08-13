@@ -41,13 +41,15 @@ step by step instead, stopping at each detected cut for approval.
 
 ## What you need
 
-ZipClip deliberately does not bundle ffmpeg or yt-dlp. yt-dlp needs regular
-updates to keep up with Twitch, and a bundled copy would go stale; ffmpeg
-carries redistribution obligations that do not belong in an MIT project.
-Install both yourself, then point ZipClip at them (or just have them on
-your PATH):
+On Windows, nothing: the download ships a purpose-built minimal ffmpeg and
+the official yt-dlp next to zipclip.exe, and ZipClip updates yt-dlp at
+launch so it keeps up with Twitch. See `installer/buildwin/README.md` for
+how the package is built and how the GPL ffmpeg build relates to ZipClip's
+MIT license.
 
-- Windows: `winget install yt-dlp.yt-dlp` and `winget install Gyan.FFmpeg`
+On Linux, install ffmpeg and yt-dlp yourself, then point ZipClip at them
+(or just have them on your PATH):
+
 - Arch Linux: `sudo pacman -S yt-dlp` and `sudo pacman -S ffmpeg`
 - Debian/Ubuntu: `sudo apt install yt-dlp` and `sudo apt install ffmpeg`
 

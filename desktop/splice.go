@@ -32,7 +32,7 @@ func TrimFrom(ctx context.Context, cfg Config, vodPath string, cut float64, outP
 		outPath,
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.FfmpegPath, args...)
+	cmd := exec.CommandContext(ctx, resolveFfmpeg(cfg), args...)
 	out, runErr := cmd.CombinedOutput()
 	if runErr != nil {
 		return fmt.Errorf("ffmpeg trim: %w: %s", runErr, truncate(string(out), 300))
@@ -60,7 +60,7 @@ func ConcatIntro(ctx context.Context, cfg Config, introPath, trimmedPath, outPat
 		outPath,
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.FfmpegPath, args...)
+	cmd := exec.CommandContext(ctx, resolveFfmpeg(cfg), args...)
 	out, runErr := cmd.CombinedOutput()
 	if runErr != nil {
 		return fmt.Errorf("ffmpeg concat: %w: %s", runErr, truncate(string(out), 300))
@@ -87,7 +87,7 @@ func MediaDuration(ctx context.Context, cfg Config, path string) (float64, error
 		path,
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.FfprobePath, args...)
+	cmd := exec.CommandContext(ctx, resolveFfprobe(cfg), args...)
 	out, runErr := cmd.Output()
 	if runErr != nil {
 		return 0, fmt.Errorf("ffprobe %s: %w", filepath.Base(path), runErr)

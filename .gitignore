@@ -1,4 +1,6 @@
 bin/
 installer/.tools/
+installer/vendor/
+goaudit-report.json
 desktop/zipclip.exe
 desktop/zipclip

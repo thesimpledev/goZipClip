@@ -30,14 +30,16 @@ Created by TheSimpleDev: https://thesimpledev.com
 ### 1. Install yt-dlp and ffmpeg
 
 ZipClip drives two well-known free tools: yt-dlp downloads the VODs and
-ffmpeg does the video work (ffprobe comes with it). ZipClip does not bundle
-them, because yt-dlp needs regular updates to keep up with Twitch.
+ffmpeg does the video work (ffprobe comes with it).
 
-Windows, in PowerShell (press Start, type `powershell`, press Enter,
-then type each command and press Enter):
+**On Windows there is nothing to install.** The ZipClip download ships
+both tools in the same folder as zipclip.exe: a purpose-built ffmpeg
+(see `installer/buildwin/README.md`) and the official yt-dlp, which
+ZipClip updates automatically on every launch, because yt-dlp needs
+regular updates to keep up with Twitch. Setting an explicit path in
+Settings still overrides both.
 
-    winget install yt-dlp.yt-dlp
-    winget install Gyan.FFmpeg
+On Linux, install them with your package manager.
 
 Arch Linux:
 
@@ -56,6 +58,10 @@ Direct downloads, if you would rather not use a package manager:
 
 If they end up on your PATH (the commands above do that), ZipClip finds
 them automatically. Otherwise note where they are for step 3.
+
+The paths in Settings decide what actually runs: an explicit path wins,
+then the bundled ffmpeg (Windows) or the self-updating yt-dlp copy, and
+PATH is the fallback.
 
 ### 2. Install ZipClip
 

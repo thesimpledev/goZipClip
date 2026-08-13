@@ -23,7 +23,7 @@ func DetectCut(ctx context.Context, cfg Config, vodPath string) (float64, error)
 		return 0, errors.New("vod path is empty")
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.FfmpegPath, sceneScanArgs(cfg, vodPath)...)
+	cmd := exec.CommandContext(ctx, resolveFfmpeg(cfg), sceneScanArgs(cfg, vodPath)...)
 	out, runErr := cmd.CombinedOutput()
 	if runErr != nil {
 		return 0, fmt.Errorf("ffmpeg scene scan: %w: %s", runErr, truncate(string(out), 300))
@@ -93,7 +93,7 @@ func ExtractPreview(ctx context.Context, cfg Config, vodPath string, at float64,
 		outPath,
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.FfmpegPath, args...)
+	cmd := exec.CommandContext(ctx, resolveFfmpeg(cfg), args...)
 	out, runErr := cmd.CombinedOutput()
 	if runErr != nil {
 		return fmt.Errorf("ffmpeg preview: %w: %s", runErr, truncate(string(out), 300))
