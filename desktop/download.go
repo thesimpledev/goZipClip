@@ -26,7 +26,7 @@ func DownloadNew(ctx context.Context, cfg Config, logf func(string, ...any)) ([]
 		return nil, beforeErr
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.YtdlpPath, ytdlpArgs(cfg, rawDir)...)
+	cmd := exec.CommandContext(ctx, resolveYtdlp(cfg), ytdlpArgs(cfg, rawDir)...)
 	out, runErr := cmd.CombinedOutput()
 	logTail(logf, "yt-dlp", out)
 	if runErr != nil {
@@ -54,7 +54,7 @@ func SeedArchive(ctx context.Context, cfg Config, logf func(string, ...any)) err
 		channelVideosURL(cfg),
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.YtdlpPath, args...)
+	cmd := exec.CommandContext(ctx, resolveYtdlp(cfg), args...)
 	out, runErr := cmd.CombinedOutput()
 	logTail(logf, "yt-dlp", out)
 	if runErr != nil {
@@ -74,17 +74,19 @@ func DownloadLatest(ctx context.Context, cfg Config, logf func(string, ...any)) 
 		return "", mkErr
 	}
 	args := []string{
-		"--playlist-items", "1",
+		"--playlist-items", "1-3",
 		"--match-filter", "!is_live",
+		"--max-downloads", "1",
 		"--no-progress",
 		"-o", filepath.Join(rawDir, "%(upload_date)s-%(id)s.%(ext)s"),
-		channelVideosURL(cfg),
 	}
+	args = append(args, downloadFormatArgs(cfg)...)
+	args = append(args, channelVideosURL(cfg))
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.YtdlpPath, args...)
+	cmd := exec.CommandContext(ctx, resolveYtdlp(cfg), args...)
 	out, runErr := cmd.CombinedOutput()
 	logTail(logf, "yt-dlp", out)
-	if runErr != nil {
+	if runErr != nil && !isMaxDownloadsAbort(runErr) {
 		return "", fmt.Errorf("yt-dlp latest: %w", runErr)
 	}
 	files, listErr := listVideoFiles(rawDir)
@@ -95,28 +97,49 @@ func DownloadLatest(ctx context.Context, cfg Config, logf func(string, ...any)) 
 	if latest == "" {
 		return "", errors.New("no VOD file found after downloading the latest")
 	}
-	return latest, recordLatestInArchive(ctx, cfg, logf)
+	return latest, recordLatestInArchive(ctx, cfg, logf, latest)
 }
 
-// recordLatestInArchive marks the newest VOD as handled so the next
-// scheduled run does not download it again.
-func recordLatestInArchive(ctx context.Context, cfg Config, logf func(string, ...any)) error {
+// recordLatestInArchive marks the downloaded VOD as handled so the
+// next scheduled run does not download it again.
+func recordLatestInArchive(ctx context.Context, cfg Config, logf func(string, ...any), vodPath string) error {
+	id, idErr := vodIDFromFilename(vodPath)
+	if idErr != nil {
+		return idErr
+	}
 	args := []string{
 		"--download-archive", archivePath(),
 		"--simulate",
 		"--force-write-download-archive",
-		"--playlist-items", "1",
 		"--no-progress",
-		channelVideosURL(cfg),
+		"https://www.twitch.tv/videos/" + id,
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.YtdlpPath, args...)
+	cmd := exec.CommandContext(ctx, resolveYtdlp(cfg), args...)
 	out, runErr := cmd.CombinedOutput()
 	logTail(logf, "yt-dlp", out)
 	if runErr != nil {
 		return fmt.Errorf("yt-dlp archive record: %w", runErr)
 	}
 	return nil
+}
+
+// isMaxDownloadsAbort reports whether yt-dlp exited with code 101,
+// which means --max-downloads stopped it after a successful download.
+func isMaxDownloadsAbort(err error) bool {
+	var exitErr *exec.ExitError
+	return errors.As(err, &exitErr) && exitErr.ExitCode() == 101
+}
+
+// vodIDFromFilename extracts the VOD id from a raw file named
+// %(upload_date)s-%(id)s.%(ext)s.
+func vodIDFromFilename(path string) (string, error) {
+	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	_, id, found := strings.Cut(base, "-")
+	if !found || id == "" {
+		return "", fmt.Errorf("no VOD id in file name %q", path)
+	}
+	return id, nil
 }
 
 // LatestVODID returns the id of the newest VOD on the channel without
@@ -133,7 +156,7 @@ func LatestVODID(ctx context.Context, cfg Config, logf func(string, ...any)) (st
 		channelVideosURL(cfg),
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, cfg.YtdlpPath, args...)
+	cmd := exec.CommandContext(ctx, resolveYtdlp(cfg), args...)
 	out, runErr := cmd.CombinedOutput()
 	if runErr != nil {
 		logTail(logf, "yt-dlp", out)
@@ -189,14 +212,31 @@ func channelVideosURL(cfg Config) string {
 }
 
 func ytdlpArgs(cfg Config, rawDir string) []string {
-	return []string{
+	args := []string{
 		"--download-archive", archivePath(),
 		"--playlist-items", "1-3",
 		"--match-filter", "!is_live",
 		"--no-progress",
 		"-o", filepath.Join(rawDir, "%(upload_date)s-%(id)s.%(ext)s"),
-		channelVideosURL(cfg),
 	}
+	args = append(args, downloadFormatArgs(cfg)...)
+	return append(args, channelVideosURL(cfg))
+}
+
+// downloadFormatArgs pins what yt-dlp delivers: prefer h264 video with
+// aac audio and remux into mp4, so the stream-copy pipeline and the
+// minimal bundled ffmpeg always receive the codecs they expect. When
+// the resolved ffmpeg is a concrete file rather than a PATH name,
+// yt-dlp is pointed at the same copy the pipeline uses.
+func downloadFormatArgs(cfg Config) []string {
+	args := []string{
+		"-S", "codec:h264:aac",
+		"--remux-video", "mp4",
+	}
+	if ffmpeg := resolveFfmpeg(cfg); filepath.IsAbs(ffmpeg) {
+		args = append(args, "--ffmpeg-location", ffmpeg)
+	}
+	return args
 }
 
 // listVideoFiles returns the finished (non-partial) files in dir,
