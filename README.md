@@ -64,16 +64,21 @@ run, is in [desktop/README.md](desktop/README.md) under "Setup guide".
 
 ## Releasing
 
-Each deployment is separate and has its own tag namespace:
+Desktop releases are built and published from the local machine, one
+vetted command per platform:
 
-- `linux-v*` triggers `Release Linux` only.
-- `windows-v*` triggers `Release Windows` only.
-- The website deploys through its own workflow, independent of both.
+- `just release-linux` and `just release-windows` each run the gates,
+  build the archive, and upload it to the website's download location
+  (see `website/DOWNLOADS.md`). The Windows package needs Linux with
+  mingw-w64 for the bundled ffmpeg, see `installer/buildwin/README.md`.
+- Tag the released commit `linux-v*` / `windows-v*` so the shipped code
+  stays identifiable. The tags trigger nothing.
+- The website deploys through its GitHub Actions workflow on a `web-v*`
+  tag, independent of both.
+- The Microsoft Store package is built on a Windows machine with
+  `installer/build-msix.ps1` and uploaded to Partner Center by hand.
 
-Each release workflow builds on a native runner of its platform, runs the
-test suite, and uploads its archive to the website's download location.
-Releasing one platform never touches the other. The one-time AWS setup is
-documented at the top of `.github/workflows/release-linux.yml`.
+Releasing one platform never touches the other.
 
 ## License
 
