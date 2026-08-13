@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setup Guide - ZipClip</title>
-    <meta name="description" content="Step-by-step ZipClip setup: install yt-dlp and ffmpeg, configure the app, and let it process your VODs automatically.">
+    <meta name="description" content="Step-by-step ZipClip setup: download the app, configure it, and let it process your VODs automatically.">
     <link rel="stylesheet" href="css/style.css?v=5">
     <link rel="icon" href="images/favicon.png?v=1" type="image/png">
 </head>
@@ -42,7 +42,7 @@
 
         <div class="legal">
             <h2>1. Install yt-dlp and ffmpeg</h2>
-            <p>ZipClip drives two well-known free tools: yt-dlp downloads the VODs and ffmpeg does the video work (ffprobe comes with it). ZipClip does not bundle them, because yt-dlp needs regular updates to keep up with Twitch.</p>
+            <p>ZipClip drives two well-known free tools: yt-dlp downloads the VODs and ffmpeg does the video work (ffprobe comes with it). On Windows both are included in the ZipClip download, so there is nothing to install. On Linux, install them with your package manager.</p>
             <div class="os-tabs">
                 <input type="radio" name="tools-os" id="tools-windows" checked>
                 <input type="radio" name="tools-os" id="tools-arch">
@@ -53,11 +53,7 @@
                     <label for="tools-debian">Debian / Ubuntu</label>
                 </div>
                 <section class="os-tab-panel">
-                    <p>Open PowerShell: press the <kbd>Start</kbd> button, type <code>powershell</code>, and press <kbd>Enter</kbd>. A blue window with a text prompt opens. Type each command below into it, pressing <kbd>Enter</kbd> after each one, and let the first finish before starting the second.</p>
-                    <p>Install yt-dlp (<a href="https://github.com/yt-dlp/yt-dlp/releases" target="_blank" rel="noopener noreferrer">direct download</a>):</p>
-                    <pre><code>winget install yt-dlp.yt-dlp</code></pre>
-                    <p>Install ffmpeg (<a href="https://www.gyan.dev/ffmpeg/builds/" target="_blank" rel="noopener noreferrer">direct download</a>):</p>
-                    <pre><code>winget install Gyan.FFmpeg</code></pre>
+                    <p>Nothing to install. The ZipClip download in step 2 ships both tools alongside the app, and ZipClip updates yt-dlp automatically on every launch, because yt-dlp needs regular updates to keep up with Twitch. Go straight to step 2.</p>
                 </section>
                 <section class="os-tab-panel">
                     <p>Install yt-dlp (<a href="https://github.com/yt-dlp/yt-dlp/releases" target="_blank" rel="noopener noreferrer">direct download</a>):</p>
@@ -72,7 +68,7 @@
                     <pre><code>sudo apt install ffmpeg</code></pre>
                 </section>
             </div>
-            <p>If they end up on your PATH (the commands above do that), ZipClip finds them automatically. Otherwise note where they are for step 3.</p>
+            <p>On Linux, if they end up on your PATH (the commands above do that), ZipClip finds them automatically. Otherwise note where they are for step 3.</p>
 
             <h2>2. Install ZipClip</h2>
             <div class="inline-downloads">
@@ -109,7 +105,7 @@
                 <li><strong>Intro file:</strong> the video spliced onto the front of every VOD. It must have an audio track.</li>
                 <li><strong>Output folder:</strong> where finished videos land. Point your upload tool's watch folder here.</li>
                 <li><strong>Work folder:</strong> scratch space for downloads. Needs room for a full VOD (often 5 to 15 GB).</li>
-                <li><strong>yt-dlp / ffmpeg / ffprobe paths:</strong> leave as-is if they are on PATH, otherwise browse to the executables from step 1.</li>
+                <li><strong>yt-dlp / ffmpeg / ffprobe paths:</strong> leave as-is. On Windows the copies shipped with ZipClip are used automatically; on Linux they are found on PATH. Browse to an executable only if you keep your own copy somewhere else.</li>
             </ul>
             <p>Press Save.</p>
 
