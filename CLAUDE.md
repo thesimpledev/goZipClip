@@ -56,13 +56,20 @@ Three vectors, fully independent:
   so CI cannot produce it. Do not reintroduce them.
 - **Website**: push a `web-vX.Y.Z` tag; the Deploy Website workflow
   (the only workflow left) syncs `website/` to the bucket and
-  invalidates CloudFront.
+  invalidates CloudFront. The website has its own version sequence,
+  completely separate from the Linux and Windows versions: before
+  tagging, run `git tag -l 'web-v*'` and increment from the highest
+  existing web tag. Never reuse the app version for a web tag.
 - **Microsoft Store**: pull on the Windows machine, run
   `installer/build-msix.ps1`, upload to Partner Center by hand.
 
 When a build ships, bump the versions and add an entry in
-`website/updates.html`, and update the three version strings in
-`website/index.html`, then deploy the website.
+`website/updates.html`, and update every version label on the site,
+then deploy the website. The labels are the elements with
+`class="version"`; find them all with
+`grep -rn 'class="version"' website/` (currently three in
+`website/index.html` and two in `website/help.html`) and make sure
+none is left on an old version.
 
 ## Windows tool bundling
 
