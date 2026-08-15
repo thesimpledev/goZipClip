@@ -37,6 +37,11 @@ rules.
 
 ## Releasing
 
+After finishing any change, ask the user whether it should be released
+and deployed. Never assume a change ships with the work itself, and
+never assume it stays local either: finishing the code is one task,
+releasing it is a separate decision that is always the user's to make.
+
 Three vectors, fully independent:
 
 - **Linux and Windows desktop**: built and published from this (Linux)
