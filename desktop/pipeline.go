@@ -238,10 +238,14 @@ func (p *Pipeline) download(ctx context.Context, cfg Config) ([]string, error) {
 }
 
 func (p *Pipeline) processOne(ctx context.Context, cfg Config, vodPath string) error {
-	cut, cutErr := p.resolveCut(ctx, cfg, vodPath)
-	if cutErr != nil {
-		p.setState(StateError, cutErr.Error())
-		return cutErr
+	cut := 0.0
+	if cfg.CutEnabled {
+		var cutErr error
+		cut, cutErr = p.resolveCut(ctx, cfg, vodPath)
+		if cutErr != nil {
+			p.setState(StateError, cutErr.Error())
+			return cutErr
+		}
 	}
 	outPath, spliceErr := p.splice(ctx, cfg, vodPath, cut)
 	if spliceErr != nil {
@@ -276,6 +280,10 @@ func (p *Pipeline) upload(ctx context.Context, cfg Config, outPath string) error
 func (p *Pipeline) resolveCut(ctx context.Context, cfg Config, vodPath string) (float64, error) {
 	p.setState(StateDetecting, filepath.Base(vodPath))
 	cut, detectErr := DetectCut(ctx, cfg, vodPath)
+	if errors.Is(detectErr, errNoSceneChange) {
+		p.logger.Logf("%v; keeping the full VOD", detectErr)
+		cut, detectErr = 0, nil
+	}
 	if detectErr != nil {
 		return 0, detectErr
 	}
@@ -330,23 +338,77 @@ func (p *Pipeline) RegeneratePreview(ctx context.Context, at float64) error {
 	return ExtractPreview(ctx, cfg, pending.VodPath, at, preview)
 }
 
+// splice turns the raw VOD into the finished output, running only the
+// steps the configuration enables.
 func (p *Pipeline) splice(ctx context.Context, cfg Config, vodPath string, cut float64) (string, error) {
 	p.setState(StateSplicing, filepath.Base(vodPath))
-	trimmed := filepath.Join(cfg.WorkDir, "trimmed.mp4")
-	if trimErr := TrimFrom(ctx, cfg, vodPath, cut, trimmed); trimErr != nil {
-		return "", trimErr
+	outPath := outputPath(cfg, vodPath)
+	var stepErr error
+	switch {
+	case cfg.CutEnabled && cfg.IntroEnabled:
+		stepErr = p.trimAndConcat(ctx, cfg, vodPath, cut, outPath)
+	case cfg.CutEnabled:
+		stepErr = p.trimOnly(ctx, cfg, vodPath, cut, outPath)
+	case cfg.IntroEnabled:
+		stepErr = p.concatOnly(ctx, cfg, vodPath, outPath)
+	default:
+		stepErr = p.deliverRaw(vodPath, outPath)
 	}
-	intro := introForConcat(cfg)
-	base := strings.TrimSuffix(filepath.Base(vodPath), filepath.Ext(vodPath))
-	outPath := filepath.Join(cfg.OutputDir, base+".mp4")
-	if concatErr := ConcatIntro(ctx, cfg, intro, trimmed, outPath); concatErr != nil {
-		return "", concatErr
-	}
-	p.setState(StateVerifying, filepath.Base(outPath))
-	if verifyErr := p.verify(ctx, cfg, intro, trimmed, outPath); verifyErr != nil {
-		return "", verifyErr
+	if stepErr != nil {
+		return "", stepErr
 	}
 	return outPath, nil
+}
+
+// outputPath is where the finished video for vodPath lands.
+func outputPath(cfg Config, vodPath string) string {
+	base := strings.TrimSuffix(filepath.Base(vodPath), filepath.Ext(vodPath))
+	return filepath.Join(cfg.OutputDir, base+".mp4")
+}
+
+// trimAndConcat cuts the VOD, splices the intro on, and verifies the
+// combined duration.
+func (p *Pipeline) trimAndConcat(ctx context.Context, cfg Config, vodPath string, cut float64, outPath string) error {
+	trimmed := filepath.Join(cfg.WorkDir, "trimmed.mp4")
+	if trimErr := TrimFrom(ctx, cfg, vodPath, cut, trimmed); trimErr != nil {
+		return trimErr
+	}
+	intro := introForConcat(cfg)
+	if concatErr := ConcatIntro(ctx, cfg, intro, trimmed, outPath); concatErr != nil {
+		return concatErr
+	}
+	p.setState(StateVerifying, filepath.Base(outPath))
+	return p.verify(ctx, cfg, intro, trimmed, outPath)
+}
+
+// trimOnly cuts the VOD straight into the output folder. With no intro
+// there is no combined duration to check, so verification is a
+// readback of the output's duration.
+func (p *Pipeline) trimOnly(ctx context.Context, cfg Config, vodPath string, cut float64, outPath string) error {
+	if trimErr := TrimFrom(ctx, cfg, vodPath, cut, outPath); trimErr != nil {
+		return trimErr
+	}
+	p.setState(StateVerifying, filepath.Base(outPath))
+	_, durErr := MediaDuration(ctx, cfg, outPath)
+	return durErr
+}
+
+// concatOnly splices the intro onto the full VOD and verifies the
+// combined duration.
+func (p *Pipeline) concatOnly(ctx context.Context, cfg Config, vodPath, outPath string) error {
+	intro := introForConcat(cfg)
+	if concatErr := ConcatIntro(ctx, cfg, intro, vodPath, outPath); concatErr != nil {
+		return concatErr
+	}
+	p.setState(StateVerifying, filepath.Base(outPath))
+	return p.verify(ctx, cfg, intro, vodPath, outPath)
+}
+
+// deliverRaw moves the untouched VOD into the output folder. The move
+// preserves the bytes as they are, so there is nothing to verify.
+func (p *Pipeline) deliverRaw(vodPath, outPath string) error {
+	p.logger.Logf("cut and intro are both off; moving %s to the output folder", filepath.Base(vodPath))
+	return moveFile(vodPath, outPath)
 }
 
 func (p *Pipeline) verify(ctx context.Context, cfg Config, introPath, trimmedPath, outPath string) error {

@@ -14,9 +14,11 @@ import (
 type Config struct {
 	Channel             string  `json:"channel"`
 	DailyRunTime        string  `json:"dailyRunTime"`
+	CutEnabled          bool    `json:"cutEnabled"`
 	ScanWindowMinutes   int     `json:"scanWindowMinutes"`
 	SceneThreshold      float64 `json:"sceneThreshold"`
 	CutBackoffSeconds   int     `json:"cutBackoffSeconds"`
+	IntroEnabled        bool    `json:"introEnabled"`
 	IntroFile           string  `json:"introFile"`
 	OutputDir           string  `json:"outputDir"`
 	WorkDir             string  `json:"workDir"`
@@ -34,9 +36,11 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		DailyRunTime:      "8:00 AM",
+		CutEnabled:        true,
 		ScanWindowMinutes: 30,
 		SceneThreshold:    0.4,
 		CutBackoffSeconds: 5,
+		IntroEnabled:      true,
 		YtdlpPath:         "yt-dlp",
 		FfmpegPath:        "ffmpeg",
 		FfprobePath:       "ffprobe",
@@ -103,14 +107,16 @@ func (c Config) validateAccount() []string {
 
 func (c Config) validateNumbers() []string {
 	var problems []string
-	if c.ScanWindowMinutes <= 0 {
-		problems = append(problems, "scan window must be a positive number of minutes")
-	}
-	if c.SceneThreshold <= 0 || c.SceneThreshold >= 1 {
-		problems = append(problems, "scene threshold must be between 0 and 1")
-	}
-	if c.CutBackoffSeconds < 0 {
-		problems = append(problems, "cut backoff cannot be negative")
+	if c.CutEnabled {
+		if c.ScanWindowMinutes <= 0 {
+			problems = append(problems, "scan window must be a positive number of minutes")
+		}
+		if c.SceneThreshold <= 0 || c.SceneThreshold >= 1 {
+			problems = append(problems, "scene threshold must be between 0 and 1")
+		}
+		if c.CutBackoffSeconds < 0 {
+			problems = append(problems, "cut backoff cannot be negative")
+		}
 	}
 	if c.KeepFinalDays < 0 {
 		problems = append(problems, "keep finished days cannot be negative")
@@ -120,10 +126,12 @@ func (c Config) validateNumbers() []string {
 
 func (c Config) validatePaths() []string {
 	var problems []string
-	if c.IntroFile == "" {
-		problems = append(problems, "intro file is not set")
-	} else if !fileExists(c.IntroFile) {
-		problems = append(problems, "intro file does not exist: "+c.IntroFile)
+	if c.IntroEnabled {
+		if c.IntroFile == "" {
+			problems = append(problems, "intro file is not set")
+		} else if !fileExists(c.IntroFile) {
+			problems = append(problems, "intro file does not exist: "+c.IntroFile)
+		}
 	}
 	problems = append(problems, requireDir("output folder", c.OutputDir)...)
 	problems = append(problems, requireDir("work folder", c.WorkDir)...)

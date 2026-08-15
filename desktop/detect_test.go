@@ -1,10 +1,21 @@
 package main
 
 import (
+	"errors"
 	"math"
 	"strings"
 	"testing"
 )
+
+func TestNoSceneChangeIsSentinel(t *testing.T) {
+	detectErr := noSceneChange(DefaultConfig())
+	if !errors.Is(detectErr, errNoSceneChange) {
+		t.Fatalf("expected the sentinel, got %v", detectErr)
+	}
+	if !strings.Contains(detectErr.Error(), "no scene change") {
+		t.Fatalf("unexpected message: %v", detectErr)
+	}
+}
 
 // synthesized ffmpeg stderr output in the shape showinfo produces
 const showinfoFixture = `Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'vod.mp4':

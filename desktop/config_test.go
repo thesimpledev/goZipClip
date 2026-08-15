@@ -25,6 +25,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	want := DefaultConfig()
 	want.Channel = "example-channel"
 	want.SceneThreshold = 0.55
+	want.IntroEnabled = false
 	if saveErr := want.Save(path); saveErr != nil {
 		t.Fatalf("save: %v", saveErr)
 	}
@@ -52,6 +53,9 @@ func TestLoadConfigKeepsDefaultsForMissingFields(t *testing.T) {
 	if got.DailyRunTime != "8:00 AM" || got.ScanWindowMinutes != 30 {
 		t.Fatalf("defaults not kept: %+v", got)
 	}
+	if !got.CutEnabled || !got.IntroEnabled {
+		t.Fatalf("toggles should default to on: %+v", got)
+	}
 }
 
 func TestValidateReportsProblems(t *testing.T) {
@@ -77,6 +81,30 @@ func TestValidateThresholdRange(t *testing.T) {
 		if len(cfg.Validate()) == 0 {
 			t.Fatalf("threshold %v should be rejected", bad)
 		}
+	}
+}
+
+func TestValidateSkipsCutNumbersWhenCutOff(t *testing.T) {
+	cfg := validTestConfig(t)
+	cfg.CutEnabled = false
+	cfg.SceneThreshold = 1.5
+	cfg.ScanWindowMinutes = 0
+	cfg.CutBackoffSeconds = -1
+	if problems := cfg.Validate(); len(problems) != 0 {
+		t.Fatalf("expected no problems with the cut off, got %v", problems)
+	}
+}
+
+func TestValidateSkipsIntroWhenIntroOff(t *testing.T) {
+	cfg := validTestConfig(t)
+	cfg.IntroEnabled = false
+	cfg.IntroFile = ""
+	if problems := cfg.Validate(); len(problems) != 0 {
+		t.Fatalf("expected no problems with an empty intro, got %v", problems)
+	}
+	cfg.IntroFile = filepath.Join(t.TempDir(), "missing.mp4")
+	if problems := cfg.Validate(); len(problems) != 0 {
+		t.Fatalf("expected no problems with a missing intro, got %v", problems)
 	}
 }
 

@@ -28,7 +28,9 @@ Once a day, ZipClip:
    content stands out.
 4. Cuts off the prestream section and splices your intro onto the front.
    Both are stream copies, so hours of video process in minutes with no
-   re-encode and no quality loss.
+   re-encode and no quality loss. Each step is optional and on by
+   default; turn either off in Settings, and with both off the VOD lands
+   in the output folder exactly as downloaded.
 5. Drops the finished file into your output folder and verifies the result
    before anything is deleted.
 6. Uploads the finished video to your YouTube channel as a private video,

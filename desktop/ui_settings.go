@@ -18,51 +18,57 @@ import (
 
 // settingsForm holds the widgets that edit the configuration.
 type settingsForm struct {
-	channel    *widget.Entry
-	runTime    *widget.Entry
-	scanWindow *widget.Entry
-	threshold  *widget.Entry
-	backoff    *widget.Entry
-	intro      *widget.Entry
-	outputDir  *widget.Entry
-	workDir    *widget.Entry
-	ytdlp      *widget.Entry
-	ffmpeg     *widget.Entry
-	ffprobe    *widget.Entry
-	devMode    *widget.Check
-	keepDays   *widget.Entry
-	autoUpload *widget.Check
-	ytClientID *widget.Entry
-	ytSecret   *widget.Entry
+	channel      *widget.Entry
+	runTime      *widget.Entry
+	cutEnabled   *widget.Check
+	scanWindow   *widget.Entry
+	threshold    *widget.Entry
+	backoff      *widget.Entry
+	introEnabled *widget.Check
+	intro        *widget.Entry
+	outputDir    *widget.Entry
+	workDir      *widget.Entry
+	ytdlp        *widget.Entry
+	ffmpeg       *widget.Entry
+	ffprobe      *widget.Entry
+	devMode      *widget.Check
+	keepDays     *widget.Entry
+	autoUpload   *widget.Check
+	ytClientID   *widget.Entry
+	ytSecret     *widget.Entry
 }
 
 func newSettingsForm() *settingsForm {
 	return &settingsForm{
-		channel:    widget.NewEntry(),
-		runTime:    widget.NewEntry(),
-		scanWindow: widget.NewEntry(),
-		threshold:  widget.NewEntry(),
-		backoff:    widget.NewEntry(),
-		intro:      widget.NewEntry(),
-		outputDir:  widget.NewEntry(),
-		workDir:    widget.NewEntry(),
-		ytdlp:      widget.NewEntry(),
-		ffmpeg:     widget.NewEntry(),
-		ffprobe:    widget.NewEntry(),
-		devMode:    widget.NewCheck("Run step by step: approve each cut, keep intermediate files", nil),
-		keepDays:   widget.NewEntry(),
-		autoUpload: widget.NewCheck("Upload finished videos to YouTube automatically", nil),
-		ytClientID: widget.NewEntry(),
-		ytSecret:   widget.NewPasswordEntry(),
+		channel:      widget.NewEntry(),
+		runTime:      widget.NewEntry(),
+		cutEnabled:   widget.NewCheck("Cut the starting-soon screen", nil),
+		scanWindow:   widget.NewEntry(),
+		threshold:    widget.NewEntry(),
+		backoff:      widget.NewEntry(),
+		introEnabled: widget.NewCheck("Splice the intro", nil),
+		intro:        widget.NewEntry(),
+		outputDir:    widget.NewEntry(),
+		workDir:      widget.NewEntry(),
+		ytdlp:        widget.NewEntry(),
+		ffmpeg:       widget.NewEntry(),
+		ffprobe:      widget.NewEntry(),
+		devMode:      widget.NewCheck("Run step by step: approve each cut, keep intermediate files", nil),
+		keepDays:     widget.NewEntry(),
+		autoUpload:   widget.NewCheck("Upload finished videos to YouTube automatically", nil),
+		ytClientID:   widget.NewEntry(),
+		ytSecret:     widget.NewPasswordEntry(),
 	}
 }
 
 func (f *settingsForm) fill(cfg Config) {
 	f.channel.SetText(cfg.Channel)
 	f.runTime.SetText(cfg.DailyRunTime)
+	f.cutEnabled.SetChecked(cfg.CutEnabled)
 	f.scanWindow.SetText(strconv.Itoa(cfg.ScanWindowMinutes))
 	f.threshold.SetText(strconv.FormatFloat(cfg.SceneThreshold, 'f', -1, 64))
 	f.backoff.SetText(strconv.Itoa(cfg.CutBackoffSeconds))
+	f.introEnabled.SetChecked(cfg.IntroEnabled)
 	f.intro.SetText(cfg.IntroFile)
 	f.outputDir.SetText(cfg.OutputDir)
 	f.workDir.SetText(cfg.WorkDir)
@@ -82,6 +88,8 @@ func (f *settingsForm) collect() (Config, error) {
 	cfg := DefaultConfig()
 	cfg.Channel = strings.TrimSpace(f.channel.Text)
 	cfg.DailyRunTime = strings.TrimSpace(f.runTime.Text)
+	cfg.CutEnabled = f.cutEnabled.Checked
+	cfg.IntroEnabled = f.introEnabled.Checked
 	cfg.IntroFile = strings.TrimSpace(f.intro.Text)
 	cfg.OutputDir = strings.TrimSpace(f.outputDir.Text)
 	cfg.WorkDir = strings.TrimSpace(f.workDir.Text)
@@ -130,9 +138,11 @@ func (u *UI) buildSettingsPane() fyne.CanvasObject {
 	form := widget.NewForm(
 		widget.NewFormItem("Channel", u.form.channel),
 		widget.NewFormItem("Daily run time", u.form.runTime),
+		widget.NewFormItem("Cut", u.form.cutEnabled),
 		widget.NewFormItem("Scan window (minutes)", u.form.scanWindow),
 		widget.NewFormItem("Scene threshold (0-1)", u.form.threshold),
 		widget.NewFormItem("Cut backoff (seconds)", u.form.backoff),
+		widget.NewFormItem("Intro", u.form.introEnabled),
 		widget.NewFormItem("Intro file", u.withFilePicker(u.form.intro)),
 		widget.NewFormItem("Output folder", u.withDirPicker(u.form.outputDir)),
 		widget.NewFormItem("Work folder", u.withDirPicker(u.form.workDir)),

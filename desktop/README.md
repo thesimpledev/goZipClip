@@ -13,7 +13,9 @@ upload-ready file, automatically:
    scene detection to find that jump.
 4. The prestream section is cut off and your intro is spliced onto the front.
    Both steps are stream copies, so a multi-hour VOD is processed in minutes
-   without re-encoding.
+   without re-encoding. Each step has its own checkbox in Settings and is
+   on by default; with both off, the downloaded VOD is delivered to the
+   output folder unchanged.
 5. The finished file lands in the output folder. With automatic uploads
    turned on, ZipClip then uploads it to your YouTube channel as a
    private video; otherwise the Status tab lists the files waiting for
@@ -79,7 +81,8 @@ Start ZipClip. It opens on the Settings tab. Fill in:
 - **Daily run time**: when the daily check runs, 12-hour clock, for
   example `8:00 AM`. Pick a time the stream is normally over.
 - **Intro file**: the video spliced onto the front of every VOD. It must
-  have an audio track.
+  have an audio track. Only needed while "Splice the intro" is ticked;
+  untick that box to skip the intro entirely.
 - **Output folder**: where finished videos land. Point your upload tool's
   watch folder here.
 - **Work folder**: scratch space for downloads. Needs room for a full VOD
@@ -137,7 +140,9 @@ Press "Run now" on the Status tab, or wait for the scheduled time. The
 whole chain runs unattended: download, detect where the real stream
 starts, cut, splice, verify, delete the large intermediate files, and,
 with automatic uploads on, upload the result to your channel as a
-private video.
+private video. The cut and the intro splice can each be turned off in
+Settings; a run with both off simply delivers the downloaded VOD to the
+output folder unchanged.
 
 To try ZipClip on a stream that is already over, press "Run latest VOD".
 It downloads and processes the newest VOD on the channel even if it was
@@ -157,10 +162,17 @@ tray menu has Run now, Pause, and Quit.
 ## Settings notes
 
 - **Daily run time**: 12-hour clock, for example `8:00 AM` or `10:30 PM`.
+- **Cut**: whether the starting-soon screen is detected and cut off.
+  Untick it to keep every VOD from the very beginning. The scan window,
+  scene threshold, and cut backoff only apply while this is on.
+- **Intro**: whether the intro is spliced onto the front. Untick it and
+  no intro file is needed.
 - **Scene threshold**: fraction of the picture that must change in one frame
   step to count as the stream starting. `0.4` works for a mostly static
   waiting screen. If detection fires too early (an alert popup, a busy
-  animation), raise it; if it never fires, lower it.
+  animation), raise it; if it never fires, lower it. A run where nothing
+  is detected no longer stops with an error: the full VOD is kept, and
+  in dev mode the Approve tab still lets you set the time by hand.
 - **Cut backoff**: seconds subtracted from the detected point so the cut
   lands just before the stream starts. Also absorbs the keyframe snap from
   stream copying.
@@ -195,10 +207,14 @@ still on the channel counts as new again. The prepared intro
 
 ## Verification before deletion
 
-After splicing, ZipClip compares the output's duration against intro plus
-trimmed VOD. If they disagree by more than a few seconds, nothing is
-deleted and the run stops with an error, because Twitch keeps a VOD for
-only about 14 days and the raw download is the only re-download window.
+Before anything is deleted, ZipClip checks the output it produced. With
+both steps on, the output's duration must match intro plus trimmed VOD;
+with only the intro on, intro plus the full VOD. With only the cut on,
+the output's duration is read back as a sanity check. With both steps
+off the file is moved as-is, so there is nothing to verify. If a check
+disagrees by more than a few seconds, nothing is deleted and the run
+stops with an error, because Twitch keeps a VOD for only about 14 days
+and the raw download is the only re-download window.
 
 ## Building from source
 

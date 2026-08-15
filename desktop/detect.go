@@ -15,6 +15,16 @@ import (
 
 var ptsTimePattern = regexp.MustCompile(`pts_time:([0-9]+(?:\.[0-9]+)?)`)
 
+// errNoSceneChange reports a scan window that ended without a scene
+// change. The pipeline treats it as "keep the full VOD", not a failure.
+var errNoSceneChange = errors.New("no scene change found")
+
+// noSceneChange builds the detection-miss error for the configured scan.
+func noSceneChange(cfg Config) error {
+	return fmt.Errorf("%w above %.2f in the first %d minutes",
+		errNoSceneChange, cfg.SceneThreshold, cfg.ScanWindowMinutes)
+}
+
 // DetectCut scans the opening of the VOD for the first frame whose
 // scene-change score exceeds the configured threshold and returns
 // that timestamp minus the cut backoff, in seconds.
@@ -30,8 +40,7 @@ func DetectCut(ctx context.Context, cfg Config, vodPath string) (float64, error)
 	}
 	ts, found := firstPtsTime(bytes.NewReader(out))
 	if !found {
-		return 0, fmt.Errorf("no scene change above %.2f in the first %d minutes",
-			cfg.SceneThreshold, cfg.ScanWindowMinutes)
+		return 0, noSceneChange(cfg)
 	}
 	cut := ts - float64(cfg.CutBackoffSeconds)
 	if cut < 0 {

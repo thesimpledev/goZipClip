@@ -1,9 +1,11 @@
 {
   "channel": "example-channel",
   "dailyRunTime": "8:00 AM",
+  "cutEnabled": true,
   "scanWindowMinutes": 30,
   "sceneThreshold": 0.4,
   "cutBackoffSeconds": 5,
+  "introEnabled": true,
   "introFile": "C:/videos/intro.mp4",
   "outputDir": "C:/videos/upload",
   "workDir": "C:/videos/work",
