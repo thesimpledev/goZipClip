@@ -104,7 +104,7 @@
             <ul>
                 <li><strong>Channel:</strong> the Twitch channel name as it appears in the URL.</li>
                 <li><strong>Daily run time:</strong> when the daily check runs, 12-hour clock, for example <code>8:00 AM</code>. Pick a time the stream is normally over.</li>
-                <li><strong>Intro file:</strong> the video spliced onto the front of every VOD. It must have an audio track.</li>
+                <li><strong>Intro file:</strong> the video spliced onto the front of every VOD. It must have an audio track. Only needed while "Splice the intro" is ticked; untick that box to skip the intro entirely.</li>
                 <li><strong>Output folder:</strong> where finished videos land. Point your upload tool's watch folder here.</li>
                 <li><strong>Work folder:</strong> scratch space for downloads. Needs room for a full VOD (often 5 to 15 GB).</li>
                 <li><strong>yt-dlp / ffmpeg / ffprobe paths:</strong> leave as-is. On Windows the copies shipped with ZipClip are used automatically; on Linux they are found on PATH. Browse to an executable only if you keep your own copy somewhere else.</li>
@@ -131,7 +131,7 @@
             <p>Press "Mark existing VODs as downloaded". This records every VOD currently on the channel as already handled, so ZipClip never downloads your history. Only VODs published after this point are processed. Skip this step only if you really want the newest existing VODs pulled down on the first run.</p>
 
             <h3>2. First run</h3>
-            <p>Press "Run now" on the Status tab, or wait for the scheduled time. The whole chain runs unattended: download, detect where the real stream starts, cut, splice, verify, delete the large intermediate files, and, with automatic uploads on, upload the result to your channel as a private video.</p>
+            <p>Press "Run now" on the Status tab, or wait for the scheduled time. The whole chain runs unattended: download, detect where the real stream starts, cut, splice, verify, delete the large intermediate files, and, with automatic uploads on, upload the result to your channel as a private video. The cut and the intro splice can each be turned off in Settings; a run with both off simply delivers the downloaded VOD to the output folder unchanged.</p>
 
             <h3>3. Prepare the intro</h3>
             <p>Once the first VOD has downloaded, press "Prepare intro" in Settings. This re-encodes your intro to exactly match the VOD's codec, resolution, and framerate, which is what lets ZipClip splice without re-encoding hours of video. Do this once, and again whenever you change the intro file or your stream output settings.</p>
@@ -149,7 +149,9 @@
             <summary>Settings reference</summary>
             <ul>
                 <li><strong>Daily run time:</strong> 12-hour clock, for example <code>8:00 AM</code> or <code>10:30 PM</code>.</li>
-                <li><strong>Scene threshold:</strong> fraction of the picture that must change in one frame step to count as the stream starting. <code>0.4</code> works for a mostly static waiting screen. If detection fires too early (an alert popup, a busy animation), raise it; if it never fires, lower it.</li>
+                <li><strong>Cut:</strong> whether the starting-soon screen is detected and cut off. Untick it to keep every VOD from the very beginning. The scan window, scene threshold, and cut backoff only apply while this is on.</li>
+                <li><strong>Intro:</strong> whether the intro is spliced onto the front. Untick it and no intro file is needed.</li>
+                <li><strong>Scene threshold:</strong> fraction of the picture that must change in one frame step to count as the stream starting. <code>0.4</code> works for a mostly static waiting screen. If detection fires too early (an alert popup, a busy animation), raise it; if it never fires, lower it. A run where nothing is detected no longer stops with an error: the full VOD is kept, and in dev mode the Approve tab still lets you set the time by hand.</li>
                 <li><strong>Cut backoff:</strong> seconds subtracted from the detected point so the cut lands just before the stream starts. Also absorbs the keyframe snap from stream copying.</li>
                 <li><strong>Keep finished (days):</strong> finished files older than this become cleanup candidates.</li>
                 <li><strong>Dev mode:</strong> runs step by step. Each run stops on the Approve tab with a preview frame at the detected cut point; check the frame, adjust the time and press "Preview at time" if it is off, then press "Approve and splice". Intermediate files are kept and the Cleanup tab deletes them only when you press the button. Leave this off for normal use.</li>
@@ -163,7 +165,7 @@
             <details>
             <summary>What ZipClip never deletes</summary>
             <p>The download archive (<code>archive.txt</code> in the user configuration folder) is the permanent record of which VODs were already handled. Cleanup never touches it; deleting it by hand or with "Reset archive" means every VOD still on the channel counts as new again. The prepared intro (<code>intro_ready.mp4</code>) is also kept.</p>
-            <p>After splicing, ZipClip compares the output's duration against intro plus trimmed VOD. If they disagree by more than a few seconds, nothing is deleted and the run stops with an error, because Twitch keeps a VOD for only about 14 days and the raw download is the only re-download window.</p>
+            <p>Before anything is deleted, ZipClip checks the output it produced. With both steps on, the output's duration must match intro plus trimmed VOD; with only the intro on, intro plus the full VOD. With only the cut on, the output's duration is read back as a sanity check. With both steps off the file is moved as-is, so there is nothing to verify. If a check disagrees by more than a few seconds, nothing is deleted and the run stops with an error, because Twitch keeps a VOD for only about 14 days and the raw download is the only re-download window.</p>
             </details>
         </div>
     </main>
