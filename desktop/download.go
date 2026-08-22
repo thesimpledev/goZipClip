@@ -25,10 +25,8 @@ func DownloadNew(ctx context.Context, cfg Config, logf func(string, ...any)) ([]
 	if beforeErr != nil {
 		return nil, beforeErr
 	}
-	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, resolveYtdlp(cfg), ytdlpArgs(cfg, rawDir)...)
-	out, runErr := cmd.CombinedOutput()
-	logTail(logf, "yt-dlp", out)
+	cmd := newCommand(ctx, resolveYtdlp(cfg), ytdlpArgs(cfg, rawDir)...)
+	runErr := runStreaming(cmd, func(line string) { handleYtdlpLine(ctx, logf, line) })
 	if runErr != nil {
 		return nil, fmt.Errorf("yt-dlp: %w", runErr)
 	}
@@ -39,28 +37,36 @@ func DownloadNew(ctx context.Context, cfg Config, logf func(string, ...any)) ([]
 	return newFiles(before, after), nil
 }
 
-// SeedArchive marks every VOD currently on the channel as already
-// downloaded, without downloading anything. It exists for first-time
-// setup, so old VODs are never pulled down.
+// SeedArchive catalogs the channel's existing VODs into the download
+// archive without downloading anything, leaving the newest three
+// unarchived so the first run processes them. It runs once per
+// channel, automatically, when the channel is set, and records the
+// channel as scanned when it finishes.
 func SeedArchive(ctx context.Context, cfg Config, logf func(string, ...any)) error {
 	if ctx == nil || logf == nil {
 		return errors.New("missing context or logger")
 	}
+	cmd := newCommand(ctx, resolveYtdlp(cfg), seedArgs(cfg)...)
+	reportProgress(ctx, "cataloging "+cfg.Channel)
+	runErr := runStreaming(cmd, func(line string) { handleCatalogLine(ctx, logf, cfg.Channel, line) })
+	if runErr != nil {
+		return fmt.Errorf("yt-dlp archive seed: %w", runErr)
+	}
+	return MarkChannelScanned(cfg.Channel)
+}
+
+// seedArgs builds the catalog call: simulate every past broadcast but
+// the newest three into the archive, and record their names.
+func seedArgs(cfg Config) []string {
 	args := []string{
 		"--download-archive", archivePath(),
 		"--simulate",
 		"--force-write-download-archive",
-		"--no-progress",
-		channelVideosURL(cfg),
+		"--playlist-items", "4:",
+		"--no-progress", "--no-quiet",
 	}
-	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, resolveYtdlp(cfg), args...)
-	out, runErr := cmd.CombinedOutput()
-	logTail(logf, "yt-dlp", out)
-	if runErr != nil {
-		return fmt.Errorf("yt-dlp archive seed: %w", runErr)
-	}
-	return nil
+	args = append(args, ytdlpNamesArgs("")...)
+	return append(args, channelVideosURL(cfg))
 }
 
 // DownloadLatest fetches the newest VOD on the channel, ignoring the
@@ -77,15 +83,15 @@ func DownloadLatest(ctx context.Context, cfg Config, logf func(string, ...any)) 
 		"--playlist-items", "1-3",
 		"--match-filter", "!is_live",
 		"--max-downloads", "1",
-		"--no-progress",
+		"--no-simulate", "--no-quiet",
 		"-o", filepath.Join(rawDir, "%(upload_date)s-%(id)s.%(ext)s"),
 	}
+	args = append(args, ytdlpProgressArgs()...)
+	args = append(args, ytdlpNamesArgs("after_move:")...)
 	args = append(args, downloadFormatArgs(cfg)...)
 	args = append(args, channelVideosURL(cfg))
-	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, resolveYtdlp(cfg), args...)
-	out, runErr := cmd.CombinedOutput()
-	logTail(logf, "yt-dlp", out)
+	cmd := newCommand(ctx, resolveYtdlp(cfg), args...)
+	runErr := runStreaming(cmd, func(line string) { handleYtdlpLine(ctx, logf, line) })
 	if runErr != nil && !isMaxDownloadsAbort(runErr) {
 		return "", fmt.Errorf("yt-dlp latest: %w", runErr)
 	}
@@ -115,7 +121,7 @@ func recordLatestInArchive(ctx context.Context, cfg Config, logf func(string, ..
 		"https://www.twitch.tv/videos/" + id,
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, resolveYtdlp(cfg), args...)
+	cmd := newCommand(ctx, resolveYtdlp(cfg), args...)
 	out, runErr := cmd.CombinedOutput()
 	logTail(logf, "yt-dlp", out)
 	if runErr != nil {
@@ -156,7 +162,7 @@ func LatestVODID(ctx context.Context, cfg Config, logf func(string, ...any)) (st
 		channelVideosURL(cfg),
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, resolveYtdlp(cfg), args...)
+	cmd := newCommand(ctx, resolveYtdlp(cfg), args...)
 	out, runErr := cmd.CombinedOutput()
 	if runErr != nil {
 		logTail(logf, "yt-dlp", out)
@@ -214,11 +220,12 @@ func channelVideosURL(cfg Config) string {
 func ytdlpArgs(cfg Config, rawDir string) []string {
 	args := []string{
 		"--download-archive", archivePath(),
-		"--playlist-items", "1-3",
 		"--match-filter", "!is_live",
-		"--no-progress",
+		"--no-simulate", "--no-quiet",
 		"-o", filepath.Join(rawDir, "%(upload_date)s-%(id)s.%(ext)s"),
 	}
+	args = append(args, ytdlpProgressArgs()...)
+	args = append(args, ytdlpNamesArgs("after_move:")...)
 	args = append(args, downloadFormatArgs(cfg)...)
 	return append(args, channelVideosURL(cfg))
 }

@@ -16,6 +16,7 @@ type State int
 // Pipeline states, in rough order of a run.
 const (
 	StateIdle State = iota
+	StateCataloging
 	StateDownloading
 	StateDetecting
 	StateAwaitingApproval
@@ -29,6 +30,8 @@ func (s State) String() string {
 	switch s {
 	case StateIdle:
 		return "idle"
+	case StateCataloging:
+		return "cataloging"
 	case StateDownloading:
 		return "downloading"
 	case StateDetecting:
@@ -65,6 +68,7 @@ type Pipeline struct {
 	state      State
 	detail     string
 	running    bool
+	cancel     context.CancelFunc
 	pending    *PendingCut
 	approve    chan float64
 	onChange   func()
@@ -144,21 +148,80 @@ func (p *Pipeline) setState(s State, detail string) {
 	}
 }
 
-func (p *Pipeline) begin() bool {
+// progress updates the detail text of the current state without
+// writing a log line, for per-second progress from the tools.
+func (p *Pipeline) progress(detail string) {
+	p.mu.Lock()
+	p.detail = detail
+	fn := p.onChange
+	p.mu.Unlock()
+	if fn != nil {
+		fn()
+	}
+}
+
+// begin claims the pipeline for one run and returns the run's own
+// context, which Cancel ends and which carries the progress callback.
+// It reports false when a run is already in progress.
+func (p *Pipeline) begin(ctx context.Context) (context.Context, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.running {
-		return false
+		return nil, false
 	}
+	runCtx, cancel := context.WithCancel(ctx)
 	p.running = true
-	return true
+	p.cancel = cancel
+	return withProgress(runCtx, p.progress), true
 }
 
 func (p *Pipeline) end() {
 	p.mu.Lock()
+	if p.cancel != nil {
+		p.cancel()
+		p.cancel = nil
+	}
 	p.running = false
 	p.pending = nil
 	p.mu.Unlock()
+}
+
+// Cancel stops the run in progress, if any: the tool it is waiting on
+// is killed and the run ends with the status "cancelled". Scheduled
+// runs are not affected; Pause is for those.
+func (p *Pipeline) Cancel() {
+	p.mu.Lock()
+	cancel := p.cancel
+	p.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+// Running reports whether a run is in progress.
+func (p *Pipeline) Running() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.running
+}
+
+// settle turns the error of a cancelled run into the "cancelled"
+// status and leaves every other outcome alone.
+func (p *Pipeline) settle(ctx context.Context, runErr error) error {
+	if runErr != nil && errors.Is(ctx.Err(), context.Canceled) {
+		p.setState(StateIdle, "cancelled")
+		return context.Canceled
+	}
+	return runErr
+}
+
+// setError records a failed step, unless the run was cancelled, in
+// which case the kill is not an error worth showing.
+func (p *Pipeline) setError(ctx context.Context, stepErr error) {
+	if ctx.Err() != nil || stepErr == nil {
+		return
+	}
+	p.setState(StateError, stepErr.Error())
 }
 
 // Run executes one full pass: download, then processing of every new
@@ -167,10 +230,15 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	if ctx == nil {
 		return errors.New("nil context")
 	}
-	if !p.begin() {
+	runCtx, ok := p.begin(ctx)
+	if !ok {
 		return errors.New("a run is already in progress")
 	}
 	defer p.end()
+	return p.settle(runCtx, p.run(runCtx))
+}
+
+func (p *Pipeline) run(ctx context.Context) error {
 	cfg := p.store.Get()
 	if problems := cfg.Validate(); len(problems) > 0 {
 		p.setState(StateError, "configuration incomplete: "+strings.Join(problems, "; "))
@@ -178,6 +246,11 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	}
 	if waitErr := p.waitTools(ctx); waitErr != nil {
 		return waitErr
+	}
+	if !IsChannelScanned(cfg.Channel) {
+		if seedErr := p.catalog(ctx, cfg); seedErr != nil {
+			return seedErr
+		}
 	}
 	files, downloadErr := p.download(ctx, cfg)
 	if downloadErr != nil {
@@ -202,10 +275,15 @@ func (p *Pipeline) RunLatest(ctx context.Context) error {
 	if ctx == nil {
 		return errors.New("nil context")
 	}
-	if !p.begin() {
+	runCtx, ok := p.begin(ctx)
+	if !ok {
 		return errors.New("a run is already in progress")
 	}
 	defer p.end()
+	return p.settle(runCtx, p.runLatest(runCtx))
+}
+
+func (p *Pipeline) runLatest(ctx context.Context) error {
 	cfg := p.store.Get()
 	if problems := cfg.Validate(); len(problems) > 0 {
 		p.setState(StateError, "configuration incomplete: "+strings.Join(problems, "; "))
@@ -217,7 +295,7 @@ func (p *Pipeline) RunLatest(ctx context.Context) error {
 	p.setState(StateDownloading, "latest VOD on "+cfg.Channel)
 	vod, dlErr := DownloadLatest(ctx, cfg, p.logger.Logf)
 	if dlErr != nil {
-		p.setState(StateError, dlErr.Error())
+		p.setError(ctx, dlErr)
 		return dlErr
 	}
 	if procErr := p.processOne(ctx, cfg, vod); procErr != nil {
@@ -227,11 +305,48 @@ func (p *Pipeline) RunLatest(ctx context.Context) error {
 	return nil
 }
 
+// Catalog records the channel's existing VODs in the archive as a job
+// of its own, so it shows progress on the Status tab and can be
+// cancelled like a run. It happens once per channel, when the channel
+// is set.
+func (p *Pipeline) Catalog(ctx context.Context) error {
+	if ctx == nil {
+		return errors.New("nil context")
+	}
+	runCtx, ok := p.begin(ctx)
+	if !ok {
+		return errors.New("a run is already in progress")
+	}
+	defer p.end()
+	cfg := p.store.Get()
+	if cfg.Channel == "" {
+		return errors.New("channel is not set")
+	}
+	if waitErr := p.waitTools(runCtx); waitErr != nil {
+		return p.settle(runCtx, waitErr)
+	}
+	catErr := p.catalog(runCtx, cfg)
+	if catErr == nil {
+		p.setState(StateIdle, "catalog of "+cfg.Channel+" finished")
+	}
+	return p.settle(runCtx, catErr)
+}
+
+func (p *Pipeline) catalog(ctx context.Context, cfg Config) error {
+	p.setState(StateCataloging, cfg.Channel)
+	if seedErr := SeedArchive(ctx, cfg, p.logger.Logf); seedErr != nil {
+		p.setError(ctx, seedErr)
+		return seedErr
+	}
+	p.logger.Logf("cataloged the existing VODs on %s; runs now download anything newer", cfg.Channel)
+	return nil
+}
+
 func (p *Pipeline) download(ctx context.Context, cfg Config) ([]string, error) {
 	p.setState(StateDownloading, cfg.Channel)
 	files, dlErr := DownloadNew(ctx, cfg, p.logger.Logf)
 	if dlErr != nil {
-		p.setState(StateError, dlErr.Error())
+		p.setError(ctx, dlErr)
 		return nil, dlErr
 	}
 	return files, nil
@@ -243,13 +358,13 @@ func (p *Pipeline) processOne(ctx context.Context, cfg Config, vodPath string) e
 		var cutErr error
 		cut, cutErr = p.resolveCut(ctx, cfg, vodPath)
 		if cutErr != nil {
-			p.setState(StateError, cutErr.Error())
+			p.setError(ctx, cutErr)
 			return cutErr
 		}
 	}
 	outPath, spliceErr := p.splice(ctx, cfg, vodPath, cut)
 	if spliceErr != nil {
-		p.setState(StateError, spliceErr.Error())
+		p.setError(ctx, spliceErr)
 		return spliceErr
 	}
 	p.logger.Logf("finished %s", outPath)
@@ -268,7 +383,7 @@ func (p *Pipeline) processOne(ctx context.Context, cfg Config, vodPath string) e
 func (p *Pipeline) upload(ctx context.Context, cfg Config, outPath string) error {
 	p.setState(StateUploading, filepath.Base(outPath))
 	if upErr := NewYouTubeClient(cfg).Upload(ctx, outPath); upErr != nil {
-		p.setState(StateError, upErr.Error())
+		p.setError(ctx, upErr)
 		return upErr
 	}
 	p.logger.Logf("uploaded %s as a private YouTube video", filepath.Base(outPath))

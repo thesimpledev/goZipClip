@@ -131,3 +131,54 @@ func validTestConfig(t *testing.T) Config {
 	cfg.WorkDir = base
 	return cfg
 }
+
+func TestProblemsCarryFieldAndFeature(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.AutoUpload = true
+	byText := map[string]Problem{}
+	for _, problem := range cfg.Problems() {
+		byText[problem.Text] = problem
+	}
+	checks := []struct {
+		text    string
+		field   Field
+		feature Feature
+	}{
+		{"channel is not set", FieldChannel, ""},
+		{"intro file is not set", FieldIntroFile, FeatureIntro},
+		{"automatic uploads need a YouTube client ID", FieldYouTubeID, FeatureUploads},
+		{"output folder is not set", FieldOutputDir, ""},
+	}
+	for _, check := range checks {
+		problem, found := byText[check.text]
+		if !found {
+			t.Fatalf("missing problem %q in %v", check.text, cfg.Validate())
+		}
+		if problem.Field != check.field || problem.Feature != check.feature {
+			t.Fatalf("%q: got field %q feature %q", check.text, problem.Field, problem.Feature)
+		}
+	}
+}
+
+func TestValidateMatchesProblems(t *testing.T) {
+	cfg := DefaultConfig()
+	texts := cfg.Validate()
+	problems := cfg.Problems()
+	if len(texts) != len(problems) {
+		t.Fatalf("%d texts for %d problems", len(texts), len(problems))
+	}
+	for i := range texts {
+		if texts[i] != problems[i].Text {
+			t.Fatalf("text %d: %q vs %q", i, texts[i], problems[i].Text)
+		}
+	}
+}
+
+func TestFeatureLabel(t *testing.T) {
+	if FeatureIntro.Label() != "the intro" || FeatureCut.Label() != "the cut" || FeatureUploads.Label() != "automatic uploads" {
+		t.Fatal("feature labels changed")
+	}
+	if Feature("other").Label() != "other" {
+		t.Fatal("unknown feature must fall back to its name")
+	}
+}

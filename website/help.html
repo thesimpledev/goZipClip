@@ -83,7 +83,7 @@
                         </svg>
                         Download for Windows
                     </a>
-                    <span class="version">0.5.0 alpha, x86-64, .zip</span>
+                    <span class="version">0.6.0 alpha, x86-64, .zip</span>
                 </div>
                 <div>
                     <a href="/downloads/zipclip-linux-amd64.tar.gz" class="download-btn">
@@ -94,7 +94,7 @@
                         </svg>
                         Download for Linux
                     </a>
-                    <span class="version">0.5.0 alpha, x86-64, .tar.gz</span>
+                    <span class="version">0.6.0 alpha, x86-64, .tar.gz</span>
                 </div>
             </div>
             <p>Unpack the download into a folder of your choice. ZipClip keeps its settings (<code>config.json</code>), log, and download archive in your user configuration folder (Windows: <code>%AppData%\zipclip</code>, Linux: <code>~/.config/zipclip</code>), so the program itself can live anywhere.</p>
@@ -104,22 +104,22 @@
             <ul>
                 <li><strong>Channel:</strong> the Twitch channel name as it appears in the URL.</li>
                 <li><strong>Daily run time:</strong> when the daily check runs, 12-hour clock, for example <code>8:00 AM</code>. Pick a time the stream is normally over.</li>
-                <li><strong>Intro file:</strong> the video spliced onto the front of every VOD. It must have an audio track. Only needed while "Splice the intro" is ticked; untick that box to skip the intro entirely.</li>
+                <li><strong>Intro file:</strong> the video spliced onto the front of every VOD. It must have an audio track. Only needed while "Add an intro video to the start of each VOD" is ticked; untick that box to skip the intro entirely.</li>
                 <li><strong>Output folder:</strong> where finished videos land. Point your upload tool's watch folder here.</li>
                 <li><strong>Work folder:</strong> scratch space for downloads. Needs room for a full VOD (often 5 to 15 GB).</li>
                 <li><strong>yt-dlp / ffmpeg / ffprobe paths:</strong> leave as-is. On Windows the copies shipped with ZipClip are used automatically; on Linux they are found on PATH. Browse to an executable only if you keep your own copy somewhere else.</li>
             </ul>
-            <p>Press Save.</p>
+            <p>There is no Save button. Checkboxes save as soon as they change, and text fields save when you press Enter or move to another field; the line at the bottom of the tab shows a green "Saved" or a red "Not saved" so you always know where things stand. When you enter the channel, ZipClip checks that it exists on Twitch (a name it cannot find is put back) and asks you to confirm it; confirming starts the one-time catalog described under "Your back catalog" below.</p>
 
             <h3>4. Set up YouTube uploads (optional)</h3>
-            <p>ZipClip can upload each finished video to your channel by itself. Skip this step if you would rather upload by hand: the "Show files to upload" button on the Status tab lists what is waiting in the output folder.</p>
+            <p>ZipClip can upload each finished video to your channel by itself. Skip this step if you would rather upload by hand: finished videos wait in the output folder, and the "Processed videos" button on the Status tab lists every VOD ZipClip has handled.</p>
             <p>Automatic uploads need a Google OAuth client, created once in your own Google account:</p>
             <ol>
                 <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer">console.cloud.google.com</a> and sign in with the Google account that owns your YouTube channel. Create a new project; the name does not matter.</li>
                 <li>Under "APIs &amp; Services", open "Library", search for <code>YouTube Data API v3</code>, and press Enable.</li>
                 <li>Under "APIs &amp; Services", open "OAuth consent screen". Choose External, fill in the app name and your email address, and save. Then press "Publish app" so the status is "In production". This matters: while the status is Testing, Google cuts the connection after 7 days and you would have to reconnect weekly.</li>
                 <li>Under "APIs &amp; Services", open "Credentials", press "Create Credentials", pick "OAuth client ID", and choose the "Desktop app" type. Copy the Client ID and Client Secret.</li>
-                <li>In ZipClip's Settings: paste both values, tick "Upload finished videos to YouTube automatically", and press "Save settings". Then press "Connect YouTube". Your browser opens a Google consent page; because this is your own unverified project, Google shows a warning screen first. Continue past it (Advanced, then "Go to ...") and allow the upload permission.</li>
+                <li>In ZipClip's Settings: paste both values, tick "Upload finished videos to YouTube automatically" (settings save as soon as you leave each field). Then press "Connect YouTube". Your browser opens a Google consent page; because this is your own unverified project, Google shows a warning screen first. Continue past it (Advanced, then "Go to ...") and allow the upload permission.</li>
             </ol>
             <p>Uploads arrive on your channel as private videos; review and publish them from YouTube Studio. YouTube locks API uploads from unaudited projects to private, so this is also the only mode Google allows a personal project.</p>
 
@@ -127,11 +127,13 @@
 
             <details>
             <summary>Your first video</summary>
-            <h3>1. Skip your back catalog</h3>
-            <p>Press "Mark existing VODs as downloaded". This records every VOD currently on the channel as already handled, so ZipClip never downloads your history. Only VODs published after this point are processed. Skip this step only if you really want the newest existing VODs pulled down on the first run.</p>
+            <h3>1. Your back catalog</h3>
+            <p>When you confirm the channel, ZipClip catalogs every VOD already on it so your history is never downloaded: all but the newest three are recorded as handled. The Status tab shows the count as it goes, and the red Cancel button stops it. From then on every run downloads whatever the channel has that ZipClip has not handled yet. If the catalog did not finish (you cancelled it, say), the first run does it before downloading.</p>
+            <p>The "Processed videos" button on the Status tab lists what has been handled, newest first. Press Forget on an entry to have that VOD downloaded and processed again on the next run. "Reset archive" in Settings forgets everything and catalogs the channel again, like a fresh install.</p>
 
             <h3>2. First run</h3>
             <p>Press "Run now" on the Status tab, or wait for the scheduled time. The whole chain runs unattended: download, detect where the real stream starts, cut, splice, verify, delete the large intermediate files, and, with automatic uploads on, upload the result to your channel as a private video. The cut and the intro splice can each be turned off in Settings; a run with both off simply delivers the downloaded VOD to the output folder unchanged.</p>
+            <p>The Status tab shows what is happening as it happens: the download's percentage, speed, and time left, and each ffmpeg step with its position in the video. The red Cancel button stops the run in progress (the next scheduled run still happens; Pause is what holds those). Anything a run needs but does not have yet, such as an intro file, is asked for in a dialog with the choice to fill it in or turn that step off, instead of failing the run.</p>
 
             <h3>3. Prepare the intro</h3>
             <p>Once the first VOD has downloaded, press "Prepare intro" in Settings. This re-encodes your intro to exactly match the VOD's codec, resolution, and framerate, which is what lets ZipClip splice without re-encoding hours of video. Do this once, and again whenever you change the intro file or your stream output settings.</p>
@@ -142,7 +144,7 @@
             <p>From here on, ZipClip runs by itself: once a day at the time you picked, it checks the channel and processes anything new unattended.</p>
             <p>To try ZipClip on a stream that is already over, press "Run latest VOD". It downloads and processes the newest VOD on the channel even if it was already marked as handled; ZipClip warns you first in that case.</p>
             <p>ZipClip minimizes to the system tray; closing the window hides it, and the tray menu has Run now, Pause, and Quit.</p>
-            <p>Without automatic uploads, press "Show files to upload" on the Status tab to see what is waiting in the output folder, and upload however you like.</p>
+            <p>Without automatic uploads, finished videos wait in the output folder; upload them however you like. "Processed videos" on the Status tab lists every VOD ZipClip has handled.</p>
             </details>
 
             <details>
@@ -155,7 +157,7 @@
                 <li><strong>Cut backoff:</strong> seconds subtracted from the detected point so the cut lands just before the stream starts. Also absorbs the keyframe snap from stream copying.</li>
                 <li><strong>Keep finished (days):</strong> finished files older than this become cleanup candidates.</li>
                 <li><strong>Dev mode:</strong> runs step by step. Each run stops on the Approve tab with a preview frame at the detected cut point; check the frame, adjust the time and press "Preview at time" if it is off, then press "Approve and splice". Intermediate files are kept and the Cleanup tab deletes them only when you press the button. Leave this off for normal use.</li>
-                <li><strong>Uploads:</strong> unchecked means manual mode; use "Show files to upload" on the Status tab and upload however you like. Checked means every finished video is uploaded to your channel as a private video.</li>
+                <li><strong>Uploads:</strong> unchecked means manual mode; finished videos wait in the output folder and you upload them however you like. Checked means every finished video is uploaded to your channel as a private video.</li>
                 <li><strong>Reset settings</strong> puts every setting back to its default. <strong>Reset archive</strong> deletes the download archive, so every VOD still on the channel counts as new again.</li>
                 <li>The YouTube client secret and the sign-in token (<code>youtube_token.json</code>) are stored in the user configuration folder. They only grant permission to upload videos to your channel, and you can revoke them any time at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">myaccount.google.com/permissions</a>.</li>
                 <li><code>config.json</code> is plain JSON and can also be edited by hand while ZipClip is not running. It lives in your user configuration folder (Windows: <code>%AppData%\zipclip</code>, Linux: <code>~/.config/zipclip</code>).</li>

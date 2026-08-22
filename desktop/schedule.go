@@ -43,10 +43,11 @@ type Scheduler struct {
 	pipe   *Pipeline
 	runNow chan struct{}
 
-	mu       sync.Mutex
-	paused   bool
-	next     time.Time
-	onChange func()
+	mu         sync.Mutex
+	paused     bool
+	next       time.Time
+	onChange   func()
+	onProblems func([]string)
 }
 
 // NewScheduler wires a scheduler to the shared config, logger, and
@@ -60,6 +61,16 @@ func NewScheduler(store *ConfigStore, logger *Logger, pipe *Pipeline) *Scheduler
 func (s *Scheduler) SetOnChange(fn func()) {
 	s.mu.Lock()
 	s.onChange = fn
+	s.mu.Unlock()
+}
+
+// SetOnProblems registers a callback that receives the settings
+// problems keeping a run from starting, so the GUI can walk the user
+// through fixing them instead of the run failing. The GUI sets it once
+// before Loop starts.
+func (s *Scheduler) SetOnProblems(fn func([]string)) {
+	s.mu.Lock()
+	s.onProblems = fn
 	s.mu.Unlock()
 }
 
@@ -115,8 +126,29 @@ func (s *Scheduler) fire(ctx context.Context, manual bool) {
 		s.logger.Logf("scheduled run skipped: paused")
 		return
 	}
-	if runErr := s.pipe.Run(ctx); runErr != nil {
+	if problems := s.store.Get().Validate(); len(problems) > 0 {
+		s.logger.Logf("run is waiting for settings: %s", strings.Join(problems, "; "))
+		s.askForSettings(problems)
+		return
+	}
+	runErr := s.pipe.Run(ctx)
+	switch {
+	case runErr == nil:
+	case errors.Is(runErr, context.Canceled):
+		s.logger.Logf("run cancelled")
+	default:
 		s.logger.Logf("run failed: %v", runErr)
+	}
+}
+
+// askForSettings hands the problems to the GUI's walkthrough, when one
+// is registered.
+func (s *Scheduler) askForSettings(problems []string) {
+	s.mu.Lock()
+	fn := s.onProblems
+	s.mu.Unlock()
+	if fn != nil {
+		fn(problems)
 	}
 }
 

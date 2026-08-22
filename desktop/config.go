@@ -78,87 +78,162 @@ func (c Config) Save(path string) error {
 	return os.WriteFile(path, append(data, '\n'), 0o600)
 }
 
+// Field names one user-adjustable setting, so the GUI can offer the
+// right control for fixing a problem.
+type Field string
+
+// The settings a problem can point at.
+const (
+	FieldChannel       Field = "channel"
+	FieldRunTime       Field = "runTime"
+	FieldScanWindow    Field = "scanWindow"
+	FieldThreshold     Field = "threshold"
+	FieldBackoff       Field = "backoff"
+	FieldKeepDays      Field = "keepDays"
+	FieldIntroFile     Field = "introFile"
+	FieldOutputDir     Field = "outputDir"
+	FieldWorkDir       Field = "workDir"
+	FieldYtdlp         Field = "ytdlp"
+	FieldFfmpeg        Field = "ffmpeg"
+	FieldFfprobe       Field = "ffprobe"
+	FieldYouTubeID     Field = "youtubeClientId"
+	FieldYouTubeSecret Field = "youtubeClientSecret"
+)
+
+// Feature names an optional part of the pipeline that can be switched
+// off instead of configured.
+type Feature string
+
+// The optional features.
+const (
+	FeatureCut     Feature = "cut"
+	FeatureIntro   Feature = "intro"
+	FeatureUploads Feature = "uploads"
+)
+
+// Label is how the feature is named in a sentence.
+func (f Feature) Label() string {
+	switch f {
+	case FeatureCut:
+		return "the cut"
+	case FeatureIntro:
+		return "the intro"
+	case FeatureUploads:
+		return "automatic uploads"
+	default:
+		return string(f)
+	}
+}
+
+// Problem is one reason the pipeline cannot run yet: the message, the
+// setting it is about, and the optional feature it belongs to (empty
+// for settings that are always required).
+type Problem struct {
+	Text    string
+	Field   Field
+	Feature Feature
+}
+
 // Validate returns a list of problems that keep the pipeline from
 // running. An empty list means the configuration is usable.
 func (c Config) Validate() []string {
+	problems := c.Problems()
+	texts := make([]string, 0, len(problems))
+	for _, problem := range problems {
+		texts = append(texts, problem.Text)
+	}
+	return texts
+}
+
+// Problems is Validate with the setting and feature behind each
+// problem, for the GUI's walkthrough.
+func (c Config) Problems() []Problem {
 	problems := c.validateAccount()
 	problems = append(problems, c.validateNumbers()...)
 	return append(problems, c.validatePaths()...)
 }
 
-func (c Config) validateAccount() []string {
-	var problems []string
+func (c Config) validateAccount() []Problem {
+	var problems []Problem
 	if c.Channel == "" {
-		problems = append(problems, "channel is not set")
+		problems = append(problems, Problem{Text: "channel is not set", Field: FieldChannel})
 	}
 	if _, timeErr := parseRunTime(c.DailyRunTime); timeErr != nil {
-		problems = append(problems, "daily run time must look like 8:00 PM")
+		problems = append(problems, Problem{Text: "daily run time must look like 8:00 PM", Field: FieldRunTime})
 	}
 	if c.AutoUpload {
 		if c.YouTubeClientID == "" {
-			problems = append(problems, "automatic uploads need a YouTube client ID")
+			problems = append(problems, Problem{Text: "automatic uploads need a YouTube client ID",
+				Field: FieldYouTubeID, Feature: FeatureUploads})
 		}
 		if c.YouTubeClientSecret == "" {
-			problems = append(problems, "automatic uploads need a YouTube client secret")
+			problems = append(problems, Problem{Text: "automatic uploads need a YouTube client secret",
+				Field: FieldYouTubeSecret, Feature: FeatureUploads})
 		}
 	}
 	return problems
 }
 
-func (c Config) validateNumbers() []string {
-	var problems []string
+func (c Config) validateNumbers() []Problem {
+	var problems []Problem
 	if c.CutEnabled {
 		if c.ScanWindowMinutes <= 0 {
-			problems = append(problems, "scan window must be a positive number of minutes")
+			problems = append(problems, Problem{Text: "scan window must be a positive number of minutes",
+				Field: FieldScanWindow, Feature: FeatureCut})
 		}
 		if c.SceneThreshold <= 0 || c.SceneThreshold >= 1 {
-			problems = append(problems, "scene threshold must be between 0 and 1")
+			problems = append(problems, Problem{Text: "scene threshold must be between 0 and 1",
+				Field: FieldThreshold, Feature: FeatureCut})
 		}
 		if c.CutBackoffSeconds < 0 {
-			problems = append(problems, "cut backoff cannot be negative")
+			problems = append(problems, Problem{Text: "cut backoff cannot be negative",
+				Field: FieldBackoff, Feature: FeatureCut})
 		}
 	}
 	if c.KeepFinalDays < 0 {
-		problems = append(problems, "keep finished days cannot be negative")
+		problems = append(problems, Problem{Text: "keep finished days cannot be negative", Field: FieldKeepDays})
 	}
 	return problems
 }
 
-func (c Config) validatePaths() []string {
-	var problems []string
+func (c Config) validatePaths() []Problem {
+	var problems []Problem
 	if c.IntroEnabled {
 		if c.IntroFile == "" {
-			problems = append(problems, "intro file is not set")
+			problems = append(problems, Problem{Text: "intro file is not set", Field: FieldIntroFile, Feature: FeatureIntro})
 		} else if !fileExists(c.IntroFile) {
-			problems = append(problems, "intro file does not exist: "+c.IntroFile)
+			problems = append(problems, Problem{Text: "intro file does not exist: " + c.IntroFile,
+				Field: FieldIntroFile, Feature: FeatureIntro})
 		}
 	}
-	problems = append(problems, requireDir("output folder", c.OutputDir)...)
-	problems = append(problems, requireDir("work folder", c.WorkDir)...)
+	problems = append(problems, requireDir("output folder", c.OutputDir, FieldOutputDir)...)
+	problems = append(problems, requireDir("work folder", c.WorkDir, FieldWorkDir)...)
 	if c.YtdlpPath == "" {
-		problems = append(problems, "yt-dlp path is not set")
+		problems = append(problems, Problem{Text: "yt-dlp path is not set", Field: FieldYtdlp})
 	}
 	if c.FfmpegPath == "" {
-		problems = append(problems, "ffmpeg path is not set")
+		problems = append(problems, Problem{Text: "ffmpeg path is not set", Field: FieldFfmpeg})
 	}
 	if c.FfprobePath == "" {
-		problems = append(problems, "ffprobe path is not set")
+		problems = append(problems, Problem{Text: "ffprobe path is not set", Field: FieldFfprobe})
 	}
 	return problems
 }
 
-func requireDir(label, path string) []string {
+func requireDir(label, path string, field Field) []Problem {
 	if path == "" {
-		return []string{label + " is not set"}
+		return []Problem{{Text: label + " is not set", Field: field}}
 	}
+	// #nosec G703 -- the folder path is the user's own setting from config.json, checked here so a bad one is reported, not used
 	info, statErr := os.Stat(path)
 	if statErr != nil || !info.IsDir() {
-		return []string{label + " is not a folder: " + path}
+		return []Problem{{Text: label + " is not a folder: " + path, Field: field}}
 	}
 	return nil
 }
 
 func fileExists(path string) bool {
+	// #nosec G703 -- paths checked here are the user's own settings or files in the app's own folders; nothing is opened
 	info, statErr := os.Stat(path)
 	return statErr == nil && !info.IsDir()
 }

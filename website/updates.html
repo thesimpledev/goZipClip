@@ -67,6 +67,18 @@
         -->
 
         <section class="update-entry">
+            <h2>August 22, 2026 (0.6.0)</h2>
+            <ul class="update-list">
+                <li><strong>You can see what is happening, and stop it.</strong> The Status tab now shows the download as it runs (percentage, speed, time left) and each ffmpeg step with its position in the video, instead of a single "downloading" line until the end. A red Cancel button stops the run in progress; Pause still only holds the scheduled runs. (Windows 0.6.0, Linux 0.6.0)</li>
+                <li><strong>The channel is checked and cataloged when you set it.</strong> Entering the channel name checks that it exists on Twitch and asks you to confirm it. Confirming catalogs every VOD already on the channel, so your history is never downloaded, and leaves the newest three to be processed on the first run. After that, every run downloads whatever is new. The "Mark existing VODs as downloaded" button is gone; it happens by itself now.</li>
+                <li><strong>Processed videos.</strong> "Show files to upload" is replaced by a "Processed videos" button on the Status tab that lists every VOD ZipClip has handled, newest first, with a Forget button to have one downloaded and processed again on the next run.</li>
+                <li><strong>Missing settings are asked for, not reported as errors.</strong> When a run needs something that is not set, such as the intro file, ZipClip walks you through it one item at a time, with the choice to fill it in or turn that step off, and then starts the run.</li>
+                <li><strong>Settings save on their own.</strong> Checkboxes save as soon as they change and text fields when you press Enter or move on; a green "Saved" or red "Not saved" line at the bottom of the tab shows the state. The intro checkbox now reads "Add an intro video to the start of each VOD".</li>
+                <li><strong>Fixed:</strong> on Windows, Run now (and the yt-dlp update at launch) opened an empty black console window. The tools now run without one.</li>
+            </ul>
+        </section>
+
+        <section class="update-entry">
             <h2>August 15, 2026 (0.5.0)</h2>
             <ul class="update-list">
                 <li><strong>The cut and the intro are now optional.</strong> Two new checkboxes in Settings, "Cut the starting-soon screen" and "Splice the intro", turn each step off on its own. Both stay on by default. With the intro off, no intro file is needed; with both off, ZipClip becomes a pure VOD downloader and delivers each new VOD to the output folder exactly as downloaded. (Windows 0.5.0, Linux 0.5.0)</li>

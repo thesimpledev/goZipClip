@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -27,10 +27,12 @@ type UI struct {
 	pipe    *Pipeline
 	sched   *Scheduler
 
+	tabs         *container.AppTabs
 	stateLabel   *widget.Label
 	nextRunLabel *widget.Label
 	logLabel     *widget.Label
 	pauseButton  *widget.Button
+	cancelButton *widget.Button
 
 	approveInfo  *widget.Label
 	approveTime  *widget.Entry
@@ -71,7 +73,7 @@ func (u *UI) ShowAndRun() {
 }
 
 func (u *UI) buildContent() {
-	tabs := container.NewAppTabs(
+	u.tabs = container.NewAppTabs(
 		container.NewTabItem("Status", u.buildStatusPane()),
 		container.NewTabItem("Approve", u.buildApprovePane()),
 		container.NewTabItem("Cleanup", u.buildCleanupPane()),
@@ -79,15 +81,35 @@ func (u *UI) buildContent() {
 		container.NewTabItem("About", u.buildAboutPane()),
 	)
 	if len(u.store.Get().Validate()) > 0 {
-		tabs.SelectIndex(3)
+		u.tabs.SelectIndex(settingsTabIndex)
 	}
-	u.window.SetContent(tabs)
+	u.window.SetContent(u.tabs)
 }
+
+// Tab positions used when the app switches tabs on its own.
+const (
+	statusTabIndex   = 0
+	settingsTabIndex = 3
+)
 
 func (u *UI) wireCallbacks() {
 	u.pipe.SetOnChange(func() { fyne.Do(u.refreshStatus) })
 	u.sched.SetOnChange(func() { fyne.Do(u.refreshStatus) })
 	u.logger.SetOnLine(func() { fyne.Do(u.refreshLog) })
+	// A scheduled run that finds settings missing brings the window
+	// forward and walks the user through them; the run starts once
+	// everything is in place.
+	u.sched.SetOnProblems(func(_ []string) {
+		fyne.Do(func() {
+			u.window.Show()
+			u.ensureReady(u.sched.RunNow)
+		})
+	})
+}
+
+// onRunNow starts a run once the settings allow one.
+func (u *UI) onRunNow() {
+	u.ensureReady(u.sched.RunNow)
 }
 
 func (u *UI) setupTray() {
@@ -97,7 +119,7 @@ func (u *UI) setupTray() {
 	}
 	menu := fyne.NewMenu("ZipClip",
 		fyne.NewMenuItem("Show window", u.window.Show),
-		fyne.NewMenuItem("Run now", u.sched.RunNow),
+		fyne.NewMenuItem("Run now", u.onRunNow),
 		fyne.NewMenuItem("Pause or resume", func() { _ = u.sched.TogglePause() }),
 	)
 	desk.SetSystemTrayMenu(menu)
@@ -110,14 +132,17 @@ func (u *UI) buildStatusPane() fyne.CanvasObject {
 	u.nextRunLabel = widget.NewLabel("not scheduled yet")
 	u.logLabel = widget.NewLabel("")
 	u.logLabel.Wrapping = fyne.TextWrapWord
-	runButton := widget.NewButton("Run now", u.sched.RunNow)
+	runButton := widget.NewButton("Run now", u.onRunNow)
 	runLatestButton := widget.NewButton("Run latest VOD", u.onRunLatest)
-	showFilesButton := widget.NewButton("Show files to upload", u.onShowUploadFiles)
+	processedButton := widget.NewButton("Processed videos", u.onProcessedVideos)
 	u.pauseButton = widget.NewButton("Pause", func() { _ = u.sched.TogglePause() })
+	u.cancelButton = widget.NewButton("Cancel", u.pipe.Cancel)
+	u.cancelButton.Importance = widget.DangerImportance
+	u.cancelButton.Disable()
 	top := container.NewVBox(
 		u.stateLabel,
 		u.nextRunLabel,
-		container.NewHBox(runButton, runLatestButton, showFilesButton, u.pauseButton),
+		container.NewHBox(runButton, runLatestButton, processedButton, u.pauseButton, u.cancelButton),
 		widget.NewSeparator(),
 	)
 	return container.NewBorder(top, nil, nil, nil, container.NewVScroll(u.logLabel))
@@ -141,6 +166,11 @@ func (u *UI) refreshStatus() {
 		u.pauseButton.SetText("Pause")
 	}
 	u.nextRunLabel.SetText(next)
+	if u.pipe.Running() {
+		u.cancelButton.Enable()
+	} else {
+		u.cancelButton.Disable()
+	}
 	u.refreshApprove()
 }
 
@@ -153,40 +183,14 @@ func (u *UI) refreshLog() {
 	u.logLabel.SetText(strings.Join(lines[start:], "\n"))
 }
 
-// onShowUploadFiles lists the finished videos sitting in the output
-// folder, for manual uploads.
-func (u *UI) onShowUploadFiles() {
-	cfg := u.store.Get()
-	entries, readErr := os.ReadDir(cfg.OutputDir)
-	if readErr != nil {
-		dialog.ShowError(readErr, u.window)
-		return
-	}
-	var b strings.Builder
-	count := 0
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		count++
-		info, infoErr := entry.Info()
-		if infoErr != nil {
-			// The size is decoration; the name still gets listed.
-			_, _ = fmt.Fprintf(&b, "%s\n", entry.Name())
-			continue
-		}
-		_, _ = fmt.Fprintf(&b, "%s (%s)\n", entry.Name(), formatSize(info.Size()))
-	}
-	if count == 0 {
-		dialog.ShowInformation("Files to upload", "The output folder is empty.", u.window)
-		return
-	}
-	dialog.ShowInformation("Files to upload", b.String(), u.window)
+// onRunLatest downloads and processes the newest VOD on the channel,
+// warning first when the archive already lists it as handled. Missing
+// settings are walked through first.
+func (u *UI) onRunLatest() {
+	u.ensureReady(u.runLatestChecked)
 }
 
-// onRunLatest downloads and processes the newest VOD on the channel,
-// warning first when the archive already lists it as handled.
-func (u *UI) onRunLatest() {
+func (u *UI) runLatestChecked() {
 	cfg := u.store.Get()
 	go func() {
 		id, idErr := LatestVODID(context.Background(), cfg, u.logger.Logf)
@@ -212,8 +216,21 @@ func (u *UI) onRunLatest() {
 // runLatest runs the pipeline on the newest VOD and surfaces errors.
 func (u *UI) runLatest() {
 	go func() {
-		if runErr := u.pipe.RunLatest(context.Background()); runErr != nil {
+		runErr := u.pipe.RunLatest(context.Background())
+		if runErr != nil && !errors.Is(runErr, context.Canceled) {
 			fyne.Do(func() { dialog.ShowError(runErr, u.window) })
+		}
+	}()
+}
+
+// startCatalog records the channel's existing VODs in the background
+// and shows the Status tab so the progress is visible.
+func (u *UI) startCatalog() {
+	u.tabs.SelectIndex(statusTabIndex)
+	go func() {
+		catErr := u.pipe.Catalog(context.Background())
+		if catErr != nil && !errors.Is(catErr, context.Canceled) {
+			fyne.Do(func() { dialog.ShowError(catErr, u.window) })
 		}
 	}()
 }

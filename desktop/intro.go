@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -57,7 +56,7 @@ func probeParams(ctx context.Context, cfg Config, path string) (mediaParams, err
 		path,
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, resolveFfprobe(cfg), args...)
+	cmd := newCommand(ctx, resolveFfprobe(cfg), args...)
 	out, runErr := cmd.Output()
 	if runErr != nil {
 		return mediaParams{}, fmt.Errorf("ffprobe %s: %w", filepath.Base(path), runErr)
@@ -145,9 +144,10 @@ func PrepareIntro(ctx context.Context, cfg Config, logf func(string, ...any)) er
 		return fmt.Errorf("reference VOD codec is %s, not h264; prepare the intro manually", params.Codec)
 	}
 	out := introReadyPath(cfg)
-	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, resolveFfmpeg(cfg), prepareArgs(cfg, params, out)...)
-	output, runErr := cmd.CombinedOutput()
+	cmd := newCommand(ctx, resolveFfmpeg(cfg), prepareArgs(cfg, params, out)...)
+	handler := ffmpegProgressHandler(ctx, "preparing the intro",
+		func() float64 { return combinedDuration(ctx, cfg, cfg.IntroFile) })
+	output, runErr := runCapturingStderr(cmd, handler)
 	if runErr != nil {
 		return fmt.Errorf("ffmpeg intro encode: %w: %s", runErr, truncate(string(output), 300))
 	}
@@ -156,14 +156,15 @@ func PrepareIntro(ctx context.Context, cfg Config, logf func(string, ...any)) er
 }
 
 func prepareArgs(cfg Config, params mediaParams, outPath string) []string {
-	args := []string{
-		"-hide_banner", "-nostats", "-y",
+	args := []string{"-hide_banner", "-nostats", "-y"}
+	args = append(args, ffmpegProgressArgs()...)
+	args = append(args,
 		"-i", cfg.IntroFile,
-		"-vf", "scale=" + strconv.Itoa(params.Width) + ":" + strconv.Itoa(params.Height),
+		"-vf", "scale="+strconv.Itoa(params.Width)+":"+strconv.Itoa(params.Height),
 		"-r", params.FrameRate,
 		"-c:v", "libx264", "-preset", "medium", "-profile:v", "high", "-pix_fmt", "yuv420p",
 		"-c:a", "aac", "-b:a", "160k",
-	}
+	)
 	if params.SampleRate != "" {
 		args = append(args, "-ar", params.SampleRate)
 	}

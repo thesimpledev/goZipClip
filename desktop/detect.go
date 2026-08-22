@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -32,9 +32,10 @@ func DetectCut(ctx context.Context, cfg Config, vodPath string) (float64, error)
 	if vodPath == "" {
 		return 0, errors.New("vod path is empty")
 	}
-	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, resolveFfmpeg(cfg), sceneScanArgs(cfg, vodPath)...)
-	out, runErr := cmd.CombinedOutput()
+	cmd := newCommand(ctx, resolveFfmpeg(cfg), sceneScanArgs(cfg, vodPath)...)
+	handler := ffmpegProgressHandler(ctx, "scanning "+filepath.Base(vodPath)+" for the stream start",
+		func() float64 { return scanTotal(ctx, cfg, vodPath) })
+	out, runErr := runCapturingStderr(cmd, handler)
 	if runErr != nil {
 		return 0, fmt.Errorf("ffmpeg scene scan: %w: %s", runErr, truncate(string(out), 300))
 	}
@@ -52,13 +53,24 @@ func DetectCut(ctx context.Context, cfg Config, vodPath string) (float64, error)
 func sceneScanArgs(cfg Config, vodPath string) []string {
 	filter := fmt.Sprintf("scale=320:-1,select='gt(scene,%s)',showinfo",
 		strconv.FormatFloat(cfg.SceneThreshold, 'f', -1, 64))
-	return []string{
-		"-hide_banner", "-nostats",
+	args := []string{"-hide_banner", "-nostats"}
+	args = append(args, ffmpegProgressArgs()...)
+	return append(args,
 		"-i", vodPath,
-		"-t", strconv.Itoa(cfg.ScanWindowMinutes * 60),
+		"-t", strconv.Itoa(cfg.ScanWindowMinutes*60),
 		"-vf", filter,
 		"-f", "null", "-",
+	)
+}
+
+// scanTotal is how much video the scene scan will read: the scan
+// window, or the whole VOD when it is shorter.
+func scanTotal(ctx context.Context, cfg Config, vodPath string) float64 {
+	total := float64(cfg.ScanWindowMinutes * 60)
+	if duration, durErr := MediaDuration(ctx, cfg, vodPath); durErr == nil && duration < total {
+		total = duration
 	}
+	return total
 }
 
 // firstPtsTime scans ffmpeg showinfo output for the first frame
@@ -101,9 +113,8 @@ func ExtractPreview(ctx context.Context, cfg Config, vodPath string, at float64,
 		"-q:v", "3",
 		outPath,
 	}
-	// #nosec G204 -- the executable and arguments come from the user's own configuration
-	cmd := exec.CommandContext(ctx, resolveFfmpeg(cfg), args...)
-	out, runErr := cmd.CombinedOutput()
+	cmd := newCommand(ctx, resolveFfmpeg(cfg), args...)
+	out, runErr := runCapturingStderr(cmd, nil)
 	if runErr != nil {
 		return fmt.Errorf("ffmpeg preview: %w: %s", runErr, truncate(string(out), 300))
 	}

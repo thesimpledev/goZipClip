@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -77,7 +76,7 @@ func ytdlpSetupTarget() string {
 // updateYtdlp runs the managed copy's built-in self-updater.
 func updateYtdlp(ctx context.Context, managed string, logf func(string, ...any)) error {
 	// #nosec G204 -- the managed path is built from the per-user cache folder
-	cmd := exec.CommandContext(ctx, managed, "-U")
+	cmd := newCommand(ctx, managed, "-U")
 	out, runErr := cmd.CombinedOutput()
 	logTail(logf, "yt-dlp -U", out)
 	if runErr != nil {

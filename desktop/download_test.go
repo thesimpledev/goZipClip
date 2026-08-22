@@ -64,6 +64,33 @@ func TestYtdlpArgsPinFormat(t *testing.T) {
 	}
 }
 
+func TestYtdlpArgsDownloadEverythingNewWithProgress(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg := DefaultConfig()
+	cfg.Channel = "example-channel"
+	args := ytdlpArgs(cfg, filepath.Join(t.TempDir(), "raw"))
+	for _, arg := range args {
+		if arg == "--playlist-items" || arg == "--no-progress" {
+			t.Fatalf("%s must be gone from a normal run: %v", arg, args)
+		}
+	}
+	if !hasArgPair(args, "--progress-delta", "1") || !hasArgPair(args, "--download-archive", archivePath()) {
+		t.Fatalf("progress or archive flags missing: %v", args)
+	}
+	found := false
+	for _, arg := range args {
+		if arg == "--newline" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("--newline missing: %v", args)
+	}
+	if !hasArgPair(args, "--print-to-file", "after_move:%(id)s\t%(upload_date)s\t%(title)s") {
+		t.Fatalf("names must be recorded after the move: %v", args)
+	}
+}
+
 func hasArgPair(args []string, flag, value string) bool {
 	for i := 0; i+1 < len(args); i++ {
 		if args[i] == flag && args[i+1] == value {
