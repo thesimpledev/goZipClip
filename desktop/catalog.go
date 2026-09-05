@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -276,8 +277,8 @@ func LookupChannel(ctx context.Context, cfg Config, logf func(string, ...any)) e
 // is where yt-dlp puts the reason it stopped.
 func lastLine(out []byte) string {
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		if line := strings.TrimSpace(lines[i]); line != "" {
+	for _, line := range slices.Backward(lines) {
+		if line := strings.TrimSpace(line); line != "" {
 			return line
 		}
 	}
