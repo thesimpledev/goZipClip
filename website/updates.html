@@ -45,11 +45,11 @@
             <div class="version-grid">
                 <div class="version-item">
                     <span class="version-name">Windows</span>
-                    <span class="version-num">0.4.0 alpha</span>
+                    <span class="version-num">0.7.0 alpha</span>
                 </div>
                 <div class="version-item">
                     <span class="version-name">Linux</span>
-                    <span class="version-num">0.4.0 alpha</span>
+                    <span class="version-num">0.7.0 alpha</span>
                 </div>
             </div>
         </section>
@@ -65,6 +65,17 @@
         </section>
 
         -->
+
+        <section class="update-entry">
+            <h2>September 5, 2026 (0.7.0)</h2>
+            <ul class="update-list">
+                <li><strong>Three questions and you are set up.</strong> On first launch ZipClip opens on the new Dashboard and asks for the Twitch channel, then whether to cut the starting-soon screen, then whether to add an intro video (with a file picker if so). Everything else has a working default: the output and work folders are created for you under your user data folder, and finished videos are kept forever unless you set a limit. (Windows 0.7.0, Linux 0.7.0)</li>
+                <li><strong>A Dashboard and a Log tab replace the Status tab.</strong> The Dashboard shows what is running, when the next run is, what is switched on, and every button with a sentence next to it saying what it does, including new "Open output folder" and "Open log file" buttons. The Approve and Cleanup tabs only appear while Dev mode is on.</li>
+                <li><strong>Settings you can read.</strong> The Settings tab is grouped into sections with a short explanation under every setting and room around the edges, and the window is larger so it all fits. Checkboxes and text fields now have a visible outline: the old theme drew them at 1.4:1 contrast, which is why an unticked box was easy to miss. Controls now meet the WCAG AA contrast guideline.</li>
+                <li><strong>Old settings are replaced on upgrade.</strong> The settings file now carries a version, and this release starts from fresh defaults so the new folders and questions apply. Your download archive (which VODs are done) is kept.</li>
+                <li><strong>Fresh-install script for Windows.</strong> The zip now includes <code>reset-zipclip.ps1</code>, which deletes ZipClip's settings, log, archive, and default folders so the next launch behaves like a first install. Custom output or work folders are listed and left alone.</li>
+            </ul>
+        </section>
 
         <section class="update-entry">
             <h2>August 22, 2026 (0.6.0)</h2>

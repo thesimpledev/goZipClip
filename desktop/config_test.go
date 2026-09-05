@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -40,7 +42,8 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 
 func TestLoadConfigKeepsDefaultsForMissingFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	if writeErr := os.WriteFile(path, []byte(`{"channel":"example-channel"}`), 0o600); writeErr != nil {
+	body := fmt.Sprintf(`{"version":%d,"channel":"example-channel"}`, configVersion)
+	if writeErr := os.WriteFile(path, []byte(body), 0o600); writeErr != nil {
 		t.Fatalf("write: %v", writeErr)
 	}
 	got, loadErr := LoadConfig(path)
@@ -135,6 +138,7 @@ func validTestConfig(t *testing.T) Config {
 func TestProblemsCarryFieldAndFeature(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.AutoUpload = true
+	cfg.OutputDir = ""
 	byText := map[string]Problem{}
 	for _, problem := range cfg.Problems() {
 		byText[problem.Text] = problem
@@ -180,5 +184,85 @@ func TestFeatureLabel(t *testing.T) {
 	}
 	if Feature("other").Label() != "other" {
 		t.Fatal("unknown feature must fall back to its name")
+	}
+}
+
+func TestDefaultConfigHasWorkingFolders(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.OutputDir == "" || cfg.WorkDir == "" {
+		t.Fatalf("default folders should be set: %+v", cfg)
+	}
+	if cfg.OutputDir == cfg.WorkDir {
+		t.Fatalf("output and work folders must differ: %+v", cfg)
+	}
+	if filepath.Dir(cfg.OutputDir) != filepath.Dir(cfg.WorkDir) {
+		t.Fatalf("both folders should sit in the same data folder: %+v", cfg)
+	}
+	if cfg.KeepFinalDays != 0 {
+		t.Fatalf("finished videos should be kept forever by default, got %d days", cfg.KeepFinalDays)
+	}
+	if cfg.SetupDone {
+		t.Fatal("a fresh config must still ask the first-run questions")
+	}
+}
+
+func TestEnsureFoldersCreatesMissingFolders(t *testing.T) {
+	base := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.OutputDir = filepath.Join(base, "data", "output")
+	cfg.WorkDir = filepath.Join(base, "data", "work")
+	if dirErr := EnsureFolders(cfg); dirErr != nil {
+		t.Fatalf("ensure: %v", dirErr)
+	}
+	for _, dir := range []string{cfg.OutputDir, cfg.WorkDir} {
+		info, statErr := os.Stat(dir)
+		if statErr != nil || !info.IsDir() {
+			t.Fatalf("%s was not created: %v", dir, statErr)
+		}
+	}
+	if dirErr := EnsureFolders(cfg); dirErr != nil {
+		t.Fatalf("ensure again: %v", dirErr)
+	}
+}
+
+func TestEnsureFoldersSkipsEmptyPaths(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.OutputDir = ""
+	cfg.WorkDir = ""
+	if dirErr := EnsureFolders(cfg); dirErr != nil {
+		t.Fatalf("empty paths should be skipped: %v", dirErr)
+	}
+}
+
+func TestLoadConfigRejectsOtherVersions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	old := `{"channel":"example-channel","keepFinalDays":3}`
+	if writeErr := os.WriteFile(path, []byte(old), 0o600); writeErr != nil {
+		t.Fatalf("write: %v", writeErr)
+	}
+	_, loadErr := LoadConfig(path)
+	if !errors.Is(loadErr, errConfigOutdated) {
+		t.Fatalf("a file without this build's version must be rejected, got %v", loadErr)
+	}
+	newer := fmt.Sprintf(`{"version":%d,"channel":"example-channel"}`, configVersion+1)
+	if writeErr := os.WriteFile(path, []byte(newer), 0o600); writeErr != nil {
+		t.Fatalf("write: %v", writeErr)
+	}
+	if _, loadErr = LoadConfig(path); !errors.Is(loadErr, errConfigOutdated) {
+		t.Fatalf("a file from a newer version must be rejected, got %v", loadErr)
+	}
+}
+
+func TestSavedConfigCarriesVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if saveErr := DefaultConfig().Save(path); saveErr != nil {
+		t.Fatalf("save: %v", saveErr)
+	}
+	got, loadErr := LoadConfig(path)
+	if loadErr != nil {
+		t.Fatalf("a file this build wrote must load again: %v", loadErr)
+	}
+	if got.Version != configVersion {
+		t.Fatalf("version not written: %+v", got)
 	}
 }

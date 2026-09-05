@@ -106,6 +106,7 @@ func (c *checkout) stageSupportFiles(ffmpegDist, stage string) error {
 		filepath.Join(ffmpegDist, "VERSIONS.txt"),
 		filepath.Join(c.dir, "desktop", "LICENSE"),
 		filepath.Join(c.dir, "desktop", "README.md"),
+		filepath.Join(c.dir, "installer", "reset-zipclip.ps1"),
 	}
 	for _, src := range copies {
 		if copyErr := c.copyFile(src, filepath.Join(stage, filepath.Base(src))); copyErr != nil {

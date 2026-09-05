@@ -5,13 +5,25 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 )
+
+// configVersion is the layout of config.json this build writes. A file
+// with any other version is discarded at startup and replaced with the
+// defaults, so a new release can change what the settings mean without
+// carrying old values along. Bump it whenever that is wanted.
+const configVersion = 1
+
+// errConfigOutdated is returned by LoadConfig for a file written by a
+// different configVersion.
+var errConfigOutdated = errors.New("config file is from another version")
 
 // Config holds every user-adjustable setting. It is persisted as
 // config.json next to the executable and is normally edited through
 // the Settings pane, but it stays hand-editable JSON.
 type Config struct {
+	Version             int     `json:"version"`
 	Channel             string  `json:"channel"`
 	DailyRunTime        string  `json:"dailyRunTime"`
 	CutEnabled          bool    `json:"cutEnabled"`
@@ -30,26 +42,54 @@ type Config struct {
 	AutoUpload          bool    `json:"autoUpload"`
 	YouTubeClientID     string  `json:"youtubeClientId"`
 	YouTubeClientSecret string  `json:"youtubeClientSecret"`
+	// SetupDone records that the first-run questions (cut and intro)
+	// have been answered, so they are not asked again.
+	SetupDone bool `json:"setupDone"`
 }
 
-// DefaultConfig returns the settings a fresh install starts from.
+// DefaultConfig returns the settings a fresh install starts from. The
+// output and work folders default to subfolders of the per-user data
+// folder, so nothing has to be picked before the first run. Finished
+// videos are kept forever (KeepFinalDays 0) until the user chooses a
+// limit.
 func DefaultConfig() Config {
+	data := dataDir()
 	return Config{
+		Version:           configVersion,
 		DailyRunTime:      "8:00 AM",
 		CutEnabled:        true,
 		ScanWindowMinutes: 30,
 		SceneThreshold:    0.4,
 		CutBackoffSeconds: 5,
 		IntroEnabled:      true,
+		OutputDir:         filepath.Join(data, "output"),
+		WorkDir:           filepath.Join(data, "work"),
 		YtdlpPath:         "yt-dlp",
 		FfmpegPath:        "ffmpeg",
 		FfprobePath:       "ffprobe",
-		KeepFinalDays:     3,
+		KeepFinalDays:     0,
 	}
 }
 
+// EnsureFolders creates the output and work folders when they do not
+// exist yet, so a fresh install and a newly picked folder both pass
+// validation without the user creating anything by hand.
+func EnsureFolders(cfg Config) error {
+	for _, dir := range []string{cfg.OutputDir, cfg.WorkDir} {
+		if dir == "" {
+			continue
+		}
+		// #nosec G301 -- the folders hold the user's own videos; 0700 keeps them private to the user
+		if mkErr := os.MkdirAll(dir, 0o700); mkErr != nil {
+			return mkErr
+		}
+	}
+	return nil
+}
+
 // LoadConfig reads and parses the config file at path. Fields missing
-// from the file keep their default values.
+// from the file keep their default values. A file written by another
+// configVersion is rejected with errConfigOutdated.
 func LoadConfig(path string) (Config, error) {
 	if path == "" {
 		return Config{}, errors.New("config path is empty")
@@ -60,8 +100,14 @@ func LoadConfig(path string) (Config, error) {
 		return Config{}, readErr
 	}
 	cfg := DefaultConfig()
+	// The file must state its own version; a file without one is from
+	// before versions existed and must not inherit the default.
+	cfg.Version = 0
 	if jsonErr := json.Unmarshal(data, &cfg); jsonErr != nil {
 		return Config{}, fmt.Errorf("parse %s: %w", path, jsonErr)
+	}
+	if cfg.Version != configVersion {
+		return Config{}, fmt.Errorf("%s: %w (found %d, this build writes %d)", path, errConfigOutdated, cfg.Version, configVersion)
 	}
 	return cfg, nil
 }

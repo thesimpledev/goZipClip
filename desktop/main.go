@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 func main() {
@@ -23,6 +24,15 @@ func main() {
 		cfg = loaded
 	} else {
 		logger.Logf("no usable config at %s: %v", cfgPath, loadErr)
+		// Whatever was there (an older version's file, or nothing) is
+		// replaced with this build's defaults, so the next launch
+		// reads a current file.
+		if saveErr := cfg.Save(cfgPath); saveErr != nil {
+			logger.Logf("could not write default config: %v", saveErr)
+		}
+	}
+	if dirErr := EnsureFolders(cfg); dirErr != nil {
+		logger.Logf("could not create folders: %v", dirErr)
 	}
 	store := &ConfigStore{}
 	store.Set(cfg)
@@ -63,4 +73,32 @@ func configDir() string {
 		return executableDir()
 	}
 	return dir
+}
+
+// dataDir returns the per-user folder for the large files ZipClip
+// produces: the default output and work folders live in it. On
+// Windows it is %LOCALAPPDATA%\zipclip, the folder the managed
+// yt-dlp copy already uses; on other systems it follows the XDG data
+// directory (~/.local/share/zipclip). It falls back to the
+// executable's folder when no per-user location is available.
+func dataDir() string {
+	var base string
+	switch runtime.GOOS {
+	case "windows":
+		local, localErr := os.UserCacheDir()
+		if localErr != nil {
+			return executableDir()
+		}
+		base = local
+	default:
+		base = os.Getenv("XDG_DATA_HOME")
+		if base == "" {
+			home, homeErr := os.UserHomeDir()
+			if homeErr != nil {
+				return executableDir()
+			}
+			base = filepath.Join(home, ".local", "share")
+		}
+	}
+	return filepath.Join(base, "zipclip")
 }

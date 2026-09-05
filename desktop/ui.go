@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image/color"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,6 +16,8 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -28,8 +32,15 @@ type UI struct {
 	sched   *Scheduler
 
 	tabs         *container.AppTabs
+	dashboardTab *container.TabItem
+	logTab       *container.TabItem
+	approveTab   *container.TabItem
+	cleanupTab   *container.TabItem
+	settingsTab  *container.TabItem
+	aboutTab     *container.TabItem
 	stateLabel   *widget.Label
 	nextRunLabel *widget.Label
+	channelLabel *widget.Label
 	logLabel     *widget.Label
 	pauseButton  *widget.Button
 	cancelButton *widget.Button
@@ -56,8 +67,9 @@ func NewUI(cfgPath string, store *ConfigStore, logger *Logger, pipe *Pipeline, s
 		sched:   sched,
 	}
 	u.fyneApp.SetIcon(appIcon)
+	u.fyneApp.Settings().SetTheme(newZipTheme())
 	u.window = u.fyneApp.NewWindow("ZipClip")
-	u.window.Resize(fyne.NewSize(820, 600))
+	u.window.Resize(fyne.NewSize(windowWidth, windowHeight))
 	u.buildContent()
 	u.setupTray()
 	u.window.SetCloseIntercept(u.window.Hide)
@@ -65,32 +77,66 @@ func NewUI(cfgPath string, store *ConfigStore, logger *Logger, pipe *Pipeline, s
 	return u
 }
 
-// ShowAndRun displays the window and blocks until the app quits.
+// Window dimensions: the default size, and the floor below which the
+// layout would start clipping controls.
+const (
+	windowWidth     = 900
+	windowHeight    = 720
+	windowMinWidth  = 860
+	windowMinHeight = 640
+)
+
+// ShowAndRun displays the window, starts the first-run questions
+// when the app has not been set up yet, and blocks until the app
+// quits.
 func (u *UI) ShowAndRun() {
 	u.refreshLog()
 	u.refreshStatus()
-	u.window.ShowAndRun()
+	u.window.Show()
+	u.firstRun()
+	u.fyneApp.Run()
 }
 
 func (u *UI) buildContent() {
-	u.tabs = container.NewAppTabs(
-		container.NewTabItem("Status", u.buildStatusPane()),
-		container.NewTabItem("Approve", u.buildApprovePane()),
-		container.NewTabItem("Cleanup", u.buildCleanupPane()),
-		container.NewTabItem("Settings", u.buildSettingsPane()),
-		container.NewTabItem("About", u.buildAboutPane()),
-	)
-	if len(u.store.Get().Validate()) > 0 {
-		u.tabs.SelectIndex(settingsTabIndex)
-	}
-	u.window.SetContent(u.tabs)
+	u.dashboardTab = container.NewTabItem("Dashboard", u.buildDashboardPane())
+	u.logTab = container.NewTabItem("Log", u.buildLogPane())
+	u.approveTab = container.NewTabItem("Approve", u.buildApprovePane())
+	u.cleanupTab = container.NewTabItem("Cleanup", u.buildCleanupPane())
+	u.settingsTab = container.NewTabItem("Settings", u.buildSettingsPane())
+	u.aboutTab = container.NewTabItem("About", u.buildAboutPane())
+	u.tabs = container.NewAppTabs(u.tabItems(u.store.Get().DevMode)...)
+	// Fyne windows have no minimum size of their own; a transparent
+	// rectangle behind the tabs sets the floor.
+	floor := canvas.NewRectangle(color.Transparent)
+	floor.SetMinSize(fyne.NewSize(windowMinWidth, windowMinHeight))
+	u.window.SetContent(container.NewStack(floor, u.tabs))
 }
 
-// Tab positions used when the app switches tabs on its own.
-const (
-	statusTabIndex   = 0
-	settingsTabIndex = 3
-)
+// tabItems is the tab order. Approve and Cleanup only matter in dev
+// mode, so normal use shows four tabs.
+func (u *UI) tabItems(devMode bool) []*container.TabItem {
+	items := []*container.TabItem{u.dashboardTab, u.logTab}
+	if devMode {
+		items = append(items, u.approveTab, u.cleanupTab)
+	}
+	return append(items, u.settingsTab, u.aboutTab)
+}
+
+// applyDevMode shows or hides the dev-mode tabs, keeping whatever
+// tab was selected.
+func (u *UI) applyDevMode(devMode bool) {
+	keep := u.tabs.Selected()
+	u.tabs.SetItems(u.tabItems(devMode))
+	if keep != nil {
+		u.tabs.Select(keep)
+	}
+}
+
+// padded gives a pane a margin so its controls do not touch the
+// window edges.
+func padded(content fyne.CanvasObject) fyne.CanvasObject {
+	return container.New(layout.NewCustomPaddedLayout(12, 12, 16, 16), content)
+}
 
 func (u *UI) wireCallbacks() {
 	u.pipe.SetOnChange(func() { fyne.Do(u.refreshStatus) })
@@ -126,26 +172,86 @@ func (u *UI) setupTray() {
 	desk.SetSystemTrayIcon(appIcon)
 }
 
-func (u *UI) buildStatusPane() fyne.CanvasObject {
-	u.stateLabel = widget.NewLabel("idle")
+// buildDashboardPane is the home tab: what ZipClip is doing, when it
+// runs next, what is switched on, and every action with a sentence
+// saying what it does.
+func (u *UI) buildDashboardPane() fyne.CanvasObject {
+	u.stateLabel = widget.NewLabelWithStyle("idle", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	u.stateLabel.SizeName = theme.SizeNameSubHeadingText
 	u.stateLabel.Wrapping = fyne.TextWrapWord
 	u.nextRunLabel = widget.NewLabel("not scheduled yet")
-	u.logLabel = widget.NewLabel("")
-	u.logLabel.Wrapping = fyne.TextWrapWord
-	runButton := widget.NewButton("Run now", u.onRunNow)
-	runLatestButton := widget.NewButton("Run latest VOD", u.onRunLatest)
-	processedButton := widget.NewButton("Processed videos", u.onProcessedVideos)
+	u.channelLabel = widget.NewLabel("")
+	u.channelLabel.Wrapping = fyne.TextWrapWord
+	runButton := widget.NewButtonWithIcon("Run now", theme.MediaPlayIcon(), u.onRunNow)
+	runButton.Importance = widget.HighImportance
+	runLatestButton := widget.NewButtonWithIcon("Run latest VOD", theme.DownloadIcon(), u.onRunLatest)
 	u.pauseButton = widget.NewButton("Pause", func() { _ = u.sched.TogglePause() })
 	u.cancelButton = widget.NewButton("Cancel", u.pipe.Cancel)
 	u.cancelButton.Importance = widget.DangerImportance
 	u.cancelButton.Disable()
-	top := container.NewVBox(
+	processedButton := widget.NewButton("Processed videos", u.onProcessedVideos)
+	outputButton := widget.NewButtonWithIcon("Open output folder", theme.FolderOpenIcon(), u.onOpenOutput)
+	actions := container.New(layout.NewFormLayout(),
+		runButton, describe("Check the channel for VODs it has not handled yet and process them."),
+		runLatestButton, describe("Process the newest finished VOD on the channel, even if it was already handled."),
+		u.pauseButton, describe("Hold the daily scheduled run, or resume it. Runs you start by hand still work."),
+		u.cancelButton, describe("Stop the run that is in progress. The next scheduled run still happens."),
+		processedButton, describe("See every VOD ZipClip has handled, and forget one to process it again."),
+		outputButton, describe("Open the folder where finished videos land."),
+	)
+	content := container.NewVBox(
 		u.stateLabel,
 		u.nextRunLabel,
-		container.NewHBox(runButton, runLatestButton, processedButton, u.pauseButton, u.cancelButton),
+		u.channelLabel,
 		widget.NewSeparator(),
+		actions,
 	)
-	return container.NewBorder(top, nil, nil, nil, container.NewVScroll(u.logLabel))
+	return padded(container.NewVScroll(content))
+}
+
+// describe is the sentence shown next to a dashboard button.
+func describe(text string) fyne.CanvasObject {
+	label := widget.NewLabel(text)
+	label.Wrapping = fyne.TextWrapWord
+	return label
+}
+
+// buildLogPane shows the running log on its own tab.
+func (u *UI) buildLogPane() fyne.CanvasObject {
+	u.logLabel = widget.NewLabel("")
+	u.logLabel.Wrapping = fyne.TextWrapWord
+	intro := widget.NewLabel("Everything ZipClip does is written here and to the log file.")
+	intro.Wrapping = fyne.TextWrapWord
+	openButton := widget.NewButtonWithIcon("Open log file", theme.DocumentIcon(), u.onOpenLog)
+	top := container.NewBorder(nil, nil, nil, openButton, intro)
+	return padded(container.NewBorder(top, nil, nil, nil, container.NewVScroll(u.logLabel)))
+}
+
+// onOpenOutput opens the output folder in the system file browser.
+func (u *UI) onOpenOutput() {
+	u.openPath(u.store.Get().OutputDir)
+}
+
+// onOpenLog opens the log file in whatever the system uses for text.
+func (u *UI) onOpenLog() {
+	u.openPath(filepath.Join(filepath.Dir(u.cfgPath), "zipclip.log"))
+}
+
+// openPath hands a local file or folder to the system to open.
+func (u *UI) openPath(path string) {
+	if path == "" {
+		dialog.ShowInformation("Open", "Nothing to open: the path is not set.", u.window)
+		return
+	}
+	slashed := filepath.ToSlash(path)
+	if !strings.HasPrefix(slashed, "/") {
+		// Windows drive paths need the leading slash of file:///C:/...
+		slashed = "/" + slashed
+	}
+	link := &url.URL{Scheme: "file", Path: slashed}
+	if openErr := u.fyneApp.OpenURL(link); openErr != nil {
+		dialog.ShowError(openErr, u.window)
+	}
 }
 
 func (u *UI) refreshStatus() {
@@ -155,6 +261,7 @@ func (u *UI) refreshStatus() {
 		text += ": " + detail
 	}
 	u.stateLabel.SetText(text)
+	u.channelLabel.SetText(summarize(u.store.Get()))
 	next := "next run: not scheduled yet"
 	if !u.sched.Next().IsZero() {
 		next = "next run: " + u.sched.Next().Format("Mon 3:04 PM")
@@ -174,13 +281,24 @@ func (u *UI) refreshStatus() {
 	u.refreshApprove()
 }
 
-func (u *UI) refreshLog() {
-	lines := u.logger.Recent()
-	start := 0
-	if len(lines) > 50 {
-		start = len(lines) - 50
+// summarize is the one-line description of the current setup shown
+// on the dashboard.
+func summarize(cfg Config) string {
+	if cfg.Channel == "" {
+		return "No Twitch channel set yet."
 	}
-	u.logLabel.SetText(strings.Join(lines[start:], "\n"))
+	onOff := func(on bool) string {
+		if on {
+			return "on"
+		}
+		return "off"
+	}
+	return fmt.Sprintf("Channel %s. Cut %s, intro %s, YouTube uploads %s.",
+		cfg.Channel, onOff(cfg.CutEnabled), onOff(cfg.IntroEnabled), onOff(cfg.AutoUpload))
+}
+
+func (u *UI) refreshLog() {
+	u.logLabel.SetText(strings.Join(u.logger.Recent(), "\n"))
 }
 
 // onRunLatest downloads and processes the newest VOD on the channel,
@@ -226,7 +344,7 @@ func (u *UI) runLatest() {
 // startCatalog records the channel's existing VODs in the background
 // and shows the Status tab so the progress is visible.
 func (u *UI) startCatalog() {
-	u.tabs.SelectIndex(statusTabIndex)
+	u.tabs.Select(u.dashboardTab)
 	go func() {
 		catErr := u.pipe.Catalog(context.Background())
 		if catErr != nil && !errors.Is(catErr, context.Canceled) {

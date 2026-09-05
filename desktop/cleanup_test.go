@@ -60,6 +60,7 @@ func TestCleanupCandidates(t *testing.T) {
 
 func TestCleanupCandidatesRequiresWorkDir(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.WorkDir = ""
 	if _, listErr := CleanupCandidates(cfg, time.Now()); listErr == nil {
 		t.Fatal("expected an error without a work folder")
 	}
@@ -105,5 +106,23 @@ func writeTestFile(t *testing.T, path string) {
 	t.Helper()
 	if writeErr := os.WriteFile(path, []byte("data"), 0o600); writeErr != nil {
 		t.Fatalf("write %s: %v", path, writeErr)
+	}
+}
+
+func TestCleanupKeepsFinishedForeverAtZeroDays(t *testing.T) {
+	now := time.Now()
+	cfg := buildCleanupFixture(t, now)
+	cfg.KeepFinalDays = 0
+	candidates, listErr := CleanupCandidates(cfg, now)
+	if listErr != nil {
+		t.Fatalf("candidates: %v", listErr)
+	}
+	for _, c := range candidates {
+		if filepath.Dir(c.Path) == cfg.OutputDir {
+			t.Fatalf("%s is a finished video and must be kept with 0 days", c.Path)
+		}
+	}
+	if len(candidates) == 0 {
+		t.Fatal("work folder scratch files should still be listed")
 	}
 }

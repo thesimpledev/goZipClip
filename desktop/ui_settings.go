@@ -146,9 +146,10 @@ func (f *settingsForm) fill(cfg Config) {
 }
 
 // collect builds a Config from the widgets, reporting the first
-// unparseable numeric field.
-func (f *settingsForm) collect() (Config, error) {
-	cfg := DefaultConfig()
+// unparseable numeric field. Settings with no widget (SetupDone)
+// are carried over from base.
+func (f *settingsForm) collect(base Config) (Config, error) {
+	cfg := base
 	cfg.Channel = strings.TrimSpace(f.channel.Text)
 	cfg.DailyRunTime = strings.TrimSpace(f.runTime.Text)
 	cfg.CutEnabled = f.cutEnabled.Checked
@@ -199,35 +200,113 @@ func (u *UI) buildSettingsPane() fyne.CanvasObject {
 	u.form = newSettingsForm(func() { u.saveSettings(nil) })
 	u.form.fill(u.store.Get())
 	u.form.setStatus("Saved", widget.SuccessImportance)
+	sections := container.NewVBox(
+		u.channelSection(),
+		u.cutSection(),
+		u.introSection(),
+		u.folderSection(),
+		u.keepSection(),
+		u.uploadSection(),
+		u.advancedSection(),
+		u.resetSection(),
+	)
+	hint := widget.NewLabel("There is no Save button: checkboxes save as they change, and text saves when you press Enter or move on.")
+	hint.Wrapping = fyne.TextWrapWord
+	bar := container.NewVBox(widget.NewSeparator(), u.form.status)
+	return padded(container.NewBorder(hint, bar, nil, nil, container.NewVScroll(sections)))
+}
+
+// section lays out one group of settings: a heading, a sentence
+// about the group, and its rows.
+func section(title, blurb string, items ...*widget.FormItem) fyne.CanvasObject {
+	head := widget.NewLabelWithStyle(title, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	head.SizeName = theme.SizeNameSubHeadingText
+	desc := widget.NewLabel(blurb)
+	desc.Wrapping = fyne.TextWrapWord
+	return container.NewVBox(head, desc, widget.NewForm(items...), widget.NewSeparator())
+}
+
+// item is a settings row with the one-line hint shown under it.
+func item(label string, control fyne.CanvasObject, hint string) *widget.FormItem {
+	row := widget.NewFormItem(label, control)
+	row.HintText = hint
+	return row
+}
+
+func (u *UI) channelSection() fyne.CanvasObject {
+	return section("Channel and schedule",
+		"Which Twitch channel to watch and when the daily check runs.",
+		item("Channel", u.form.channel, "The channel name as it appears in the Twitch URL."),
+		item("Daily run time", u.form.runTime, "12-hour clock, for example 8:00 AM. Pick a time the stream is normally over."),
+	)
+}
+
+func (u *UI) cutSection() fyne.CanvasObject {
+	return section("Cut the starting-soon screen",
+		"Find where the real stream starts and drop everything before it. The three numbers only apply while the cut is on.",
+		item("Cut", u.form.cutEnabled, ""),
+		item("Scan window", u.form.scanWindow, "Minutes from the start of the VOD to look for the stream starting."),
+		item("Scene threshold", u.form.threshold, "Between 0 and 1. How much of the picture must change to count as the start. Raise it if the cut fires too early, lower it if it never fires."),
+		item("Cut backoff", u.form.backoff, "Seconds taken off the detected point so the cut lands just before the stream starts."),
+	)
+}
+
+func (u *UI) introSection() fyne.CanvasObject {
 	picked := func() { u.saveSettings(nil) }
-	form := widget.NewForm(
-		widget.NewFormItem("Channel", u.form.channel),
-		widget.NewFormItem("Daily run time", u.form.runTime),
-		widget.NewFormItem("Cut", u.form.cutEnabled),
-		widget.NewFormItem("Scan window (minutes)", u.form.scanWindow),
-		widget.NewFormItem("Scene threshold (0-1)", u.form.threshold),
-		widget.NewFormItem("Cut backoff (seconds)", u.form.backoff),
-		widget.NewFormItem("Intro", u.form.introEnabled),
-		widget.NewFormItem("Intro file", u.withFilePicker(u.form.intro, picked)),
-		widget.NewFormItem("Output folder", u.withDirPicker(u.form.outputDir, picked)),
-		widget.NewFormItem("Work folder", u.withDirPicker(u.form.workDir, picked)),
-		widget.NewFormItem("yt-dlp path", u.form.ytdlp),
-		widget.NewFormItem("ffmpeg path", u.form.ffmpeg),
-		widget.NewFormItem("ffprobe path", u.form.ffprobe),
-		widget.NewFormItem("Dev mode", u.form.devMode),
-		widget.NewFormItem("Keep finished (days)", u.form.keepDays),
-		widget.NewFormItem("Uploads", u.form.autoUpload),
-		widget.NewFormItem("YouTube client ID", u.form.ytClientID),
-		widget.NewFormItem("YouTube client secret", u.form.ytSecret),
+	return section("Intro video",
+		"Splice a video of your own onto the front of every VOD. It must have an audio track.",
+		item("Intro", u.form.introEnabled, ""),
+		item("Intro file", u.withFilePicker(u.form.intro, picked), "The video to put in front. Only needed while the intro is on."),
+		item("", widget.NewButton("Prepare intro", u.onPrepareIntro), "Re-encode the intro to match the latest VOD. Do this once after picking a new intro file."),
 	)
-	buttons := container.NewHBox(
-		widget.NewButton("Prepare intro", u.onPrepareIntro),
-		widget.NewButton("Connect YouTube", u.onConnectYouTube),
-		widget.NewButton("Reset settings", u.onResetSettings),
-		widget.NewButton("Reset archive", u.onResetArchive),
+}
+
+func (u *UI) folderSection() fyne.CanvasObject {
+	picked := func() { u.saveSettings(nil) }
+	return section("Folders",
+		"Where finished videos land and where downloads happen. The defaults work; change them to use another drive.",
+		item("Output folder", u.withDirPicker(u.form.outputDir, picked), "Finished videos are written here. Point your upload tool's watch folder at it."),
+		item("Work folder", u.withDirPicker(u.form.workDir, picked), "Scratch space for downloads. Needs room for a full VOD, often 5 to 15 GB."),
 	)
-	bar := container.NewBorder(nil, nil, u.form.status, buttons)
-	return container.NewBorder(nil, bar, nil, nil, container.NewVScroll(form))
+}
+
+func (u *UI) keepSection() fyne.CanvasObject {
+	return section("Keeping files",
+		"Finished videos stay in the output folder until you delete them, unless you set a limit here.",
+		item("Keep finished videos for", u.form.keepDays, "Days. 0 keeps them forever. Older files are offered for deletion on the Cleanup tab in dev mode."),
+	)
+}
+
+func (u *UI) uploadSection() fyne.CanvasObject {
+	return section("YouTube uploads",
+		"Upload every finished video to your YouTube channel as a private video. Leave this off to upload by hand.",
+		item("Uploads", u.form.autoUpload, ""),
+		item("Client ID", u.form.ytClientID, "From your Google Cloud OAuth client. See the help page for how to get one."),
+		item("Client secret", u.form.ytSecret, "From the same OAuth client. Stored in your user configuration folder."),
+		item("", widget.NewButton("Connect YouTube", u.onConnectYouTube), "Sign in once in your browser so ZipClip may upload to your channel."),
+	)
+}
+
+func (u *UI) advancedSection() fyne.CanvasObject {
+	return section("Advanced",
+		"Tool locations and the step-by-step mode. Most people never need to change these.",
+		item("yt-dlp path", u.form.ytdlp, "Leave as-is when the bundled copy or the one on PATH should be used."),
+		item("ffmpeg path", u.form.ffmpeg, "Leave as-is when the bundled copy or the one on PATH should be used."),
+		item("ffprobe path", u.form.ffprobe, "Leave as-is when the bundled copy or the one on PATH should be used."),
+		item("Dev mode", u.form.devMode, "Adds the Approve and Cleanup tabs: each cut waits for your approval and scratch files are kept until you delete them."),
+	)
+}
+
+func (u *UI) resetSection() fyne.CanvasObject {
+	resetSettings := widget.NewButton("Reset settings", u.onResetSettings)
+	resetSettings.Importance = widget.DangerImportance
+	resetArchive := widget.NewButton("Reset archive", u.onResetArchive)
+	resetArchive.Importance = widget.DangerImportance
+	return section("Start over",
+		"Both ask for confirmation first.",
+		item("", resetSettings, "Put every setting back to its default."),
+		item("", resetArchive, "Forget every VOD ZipClip has handled and catalog the channel again, as on a fresh install."),
+	)
 }
 
 // pickTarget is an entry a browse button fills in. It is the widget
@@ -278,7 +357,7 @@ func (u *UI) withDirPicker(entry pickTarget, onPick func()) fyne.CanvasObject {
 // channel name is checked and confirmed before it is kept. done, when
 // not nil, runs once the save (and any channel check) has finished.
 func (u *UI) saveSettings(done func()) {
-	cfg, collectErr := u.form.collect()
+	cfg, collectErr := u.form.collect(u.store.Get())
 	if collectErr != nil {
 		u.form.setStatus("Not saved: "+collectErr.Error(), widget.DangerImportance)
 		return
@@ -290,6 +369,12 @@ func (u *UI) saveSettings(done func()) {
 	previous := u.store.Get()
 	u.store.Set(cfg)
 	u.form.setStatus("Saved", widget.SuccessImportance)
+	if dirErr := EnsureFolders(cfg); dirErr != nil {
+		u.form.setStatus("Saved, but a folder could not be created: "+dirErr.Error(), widget.WarningImportance)
+	}
+	if cfg.DevMode != previous.DevMode {
+		u.applyDevMode(cfg.DevMode)
+	}
 	if cfg.Channel != previous.Channel && cfg.Channel != "" && !u.form.restoring {
 		u.confirmChannel(previous.Channel, cfg, done)
 		return
@@ -408,6 +493,8 @@ func (u *UI) onResetSettings() {
 		u.store.Set(cfg)
 		u.form.fill(cfg)
 		u.form.setStatus("Saved", widget.SuccessImportance)
+		u.applyDevMode(cfg.DevMode)
+		u.refreshStatus()
 	}, u.window).Show()
 }
 

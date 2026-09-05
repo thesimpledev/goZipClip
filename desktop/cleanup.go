@@ -19,9 +19,10 @@ type Candidate struct {
 
 // CleanupCandidates lists files that are safe to remove: everything
 // in the work folder except the download archive and the prepared
-// intro, plus finished outputs older than KeepFinalDays. The archive
-// file is the record of which VODs were already handled and must
-// survive every cleanup.
+// intro, plus finished outputs older than KeepFinalDays. A
+// KeepFinalDays of 0 means finished outputs are kept forever. The
+// archive file is the record of which VODs were already handled and
+// must survive every cleanup.
 func CleanupCandidates(cfg Config, now time.Time) ([]Candidate, error) {
 	if cfg.WorkDir == "" {
 		return nil, errors.New("work folder is not set")
@@ -65,7 +66,7 @@ func workFileCandidates(cfg Config) ([]Candidate, error) {
 }
 
 func oldOutputCandidates(cfg Config, now time.Time) ([]Candidate, error) {
-	if cfg.OutputDir == "" {
+	if cfg.OutputDir == "" || cfg.KeepFinalDays <= 0 {
 		return nil, nil
 	}
 	entries, readErr := os.ReadDir(cfg.OutputDir)

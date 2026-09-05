@@ -18,8 +18,8 @@ upload-ready file, automatically:
    output folder unchanged.
 5. The finished file lands in the output folder. With automatic uploads
    turned on, ZipClip then uploads it to your YouTube channel as a
-   private video; otherwise the Status tab lists the files waiting for
-   manual upload.
+   private video; otherwise the files wait in the output folder, which
+   the Dashboard's "Open output folder" button opens.
 6. Intermediate files are deleted automatically once the output is
    verified. In dev mode they are kept, listed on the Cleanup tab, and
    deleted only when you press the button.
@@ -70,41 +70,47 @@ PATH is the fallback.
 Download the build for your system from https://gozipclip.com and unpack it
 into a folder of your choice. ZipClip keeps its settings (`config.json`),
 log, and download archive in your user configuration folder (Windows:
-`%AppData%\zipclip`, Linux: `~/.config/zipclip`), so the program itself
-can live anywhere. Building from source is described below.
+`%AppData%\zipclip`, Linux: `~/.config/zipclip`), and its default
+output and work folders in your user data folder (Windows:
+`%LocalAppData%\zipclip`, Linux: `~/.local/share/zipclip`), so the
+program itself can live anywhere. Building from source is described
+below.
+
+The Windows package includes `reset-zipclip.ps1`, which deletes both
+folders so the next launch is a fresh install. Run it with ZipClip
+closed:
+
+    powershell -ExecutionPolicy Bypass -File reset-zipclip.ps1
 
 ### 3. First launch
 
-Start ZipClip. It opens on the Settings tab. Fill in:
+Start ZipClip. It opens on the Dashboard and asks three questions,
+one at a time:
 
-- **Channel**: the Twitch channel name as it appears in the URL.
-- **Daily run time**: when the daily check runs, 12-hour clock, for
-  example `8:00 AM`. Pick a time the stream is normally over.
-- **Intro file**: the video spliced onto the front of every VOD. It must
-  have an audio track. Only needed while "Add an intro video to the
-  start of each VOD" is ticked; untick that box to skip the intro
-  entirely.
-- **Output folder**: where finished videos land. Point your upload tool's
-  watch folder here.
-- **Work folder**: scratch space for downloads. Needs room for a full VOD
-  (often 5 to 15 GB).
-- **yt-dlp / ffmpeg / ffprobe paths**: leave as-is if they are on PATH,
-  otherwise browse to the executables from step 1.
+1. **Which Twitch channel to watch**: the name as it appears in the
+   channel's URL. ZipClip checks that it exists on Twitch (a name it
+   cannot find is put back) and asks you to confirm it. Confirming
+   starts the one-time catalog described in step 5.
+2. **Whether to cut the starting-soon screen** off each VOD.
+3. **Whether to add an intro video** to the front of each VOD. Yes
+   opens a file picker; the video must have an audio track.
+
+Everything else has a working default: the daily check runs at
+8:00 AM, finished videos go to the default output folder, and the
+bundled (Windows) or installed (Linux) yt-dlp and ffmpeg are used. All
+of it can be changed later on the Settings tab, which is organized
+into sections with a short explanation under every setting.
 
 There is no Save button. Checkboxes save as soon as they change, and
 text fields save when you press Enter or move to another field; the
 line at the bottom of the tab shows a green "Saved" or a red "Not
 saved" so you always know where things stand.
 
-When you enter the channel, ZipClip checks that it exists on Twitch
-(a name it cannot find is put back) and asks you to confirm it.
-Confirming starts the one-time catalog described in step 5.
-
 ### 4. Set up YouTube uploads (optional)
 
 ZipClip can upload each finished video to your channel by itself. Skip
 this step if you would rather upload by hand: finished videos wait in
-the output folder, and the "Processed videos" button on the Status tab
+the output folder, and the "Processed videos" button on the Dashboard
 lists every VOD ZipClip has handled.
 
 Automatic uploads need a Google OAuth client, created once in your own
@@ -139,13 +145,13 @@ personal project.
 
 When you confirm the channel, ZipClip catalogs every VOD already on it
 so your history is never downloaded: all but the newest three are
-recorded as handled. The Status tab shows the count as it goes, and the
+recorded as handled. The Dashboard shows the count as it goes, and the
 red Cancel button stops it. From then on every run downloads whatever
 the channel has that ZipClip has not handled yet. If the catalog did not
 finish (you cancelled it, say), the first run does it before
 downloading.
 
-The "Processed videos" button on the Status tab lists what has been
+The "Processed videos" button on the Dashboard lists what has been
 handled, newest first. Press Forget on an entry to have that VOD
 downloaded and processed again on the next run. "Reset archive" in
 Settings forgets everything and catalogs the channel again, like a
@@ -153,7 +159,7 @@ fresh install.
 
 ### 6. First run
 
-Press "Run now" on the Status tab, or wait for the scheduled time. The
+Press "Run now" on the Dashboard, or wait for the scheduled time. The
 whole chain runs unattended: download, detect where the real stream
 starts, cut, splice, verify, delete the large intermediate files, and,
 with automatic uploads on, upload the result to your channel as a
@@ -161,9 +167,12 @@ private video. The cut and the intro splice can each be turned off in
 Settings; a run with both off simply delivers the downloaded VOD to the
 output folder unchanged.
 
-The Status tab shows what is happening as it happens: the download's
+The Dashboard shows what is happening as it happens: the download's
 percentage, speed, and time left, and each ffmpeg step with its
-position in the video. The red Cancel button stops the run in progress
+position in the video. The Log tab has the full running log, and its
+"Open log file" button opens the file on disk. Every button on the
+Dashboard has a sentence next to it saying what it does. The red
+Cancel button stops the run in progress
 (the next scheduled run still happens; Pause is what holds those).
 Anything a run needs but does not have yet, such as an intro file, is
 asked for in a dialog with the choice to fill it in or turn that step
@@ -201,15 +210,16 @@ tray menu has Run now, Pause, and Quit.
 - **Cut backoff**: seconds subtracted from the detected point so the cut
   lands just before the stream starts. Also absorbs the keyframe snap from
   stream copying.
-- **Keep finished (days)**: finished files older than this become cleanup
-  candidates.
-- **Dev mode**: runs step by step. Each run stops on the Approve tab with
+- **Keep finished videos for (days)**: finished files older than this
+  become cleanup candidates. `0`, the default, keeps them forever.
+- **Dev mode**: runs step by step and adds the Approve and Cleanup
+  tabs, which are hidden otherwise. Each run stops on the Approve tab with
   a preview frame at the detected cut point; check the frame, adjust the
   time and press "Preview at time" if it is off, then press "Approve and
   splice". Intermediate files are kept and the Cleanup tab deletes them
   only when you press the button. Leave this off for normal use.
-- **Uploads**: unchecked means manual mode; use "Show files to upload"
-  on the Status tab and upload however you like. Checked means every
+- **Uploads**: unchecked means manual mode; press "Open output folder"
+  on the Dashboard and upload however you like. Checked means every
   finished video is uploaded to your channel as a private video.
 - **Reset settings** puts every setting back to its default. **Reset
   archive** deletes the download archive, so every VOD still on the
