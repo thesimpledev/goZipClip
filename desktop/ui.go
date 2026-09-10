@@ -72,7 +72,7 @@ func NewUI(cfgPath string, store *ConfigStore, logger *Logger, pipe *Pipeline, s
 	u.window.Resize(fyne.NewSize(windowWidth, windowHeight))
 	u.buildContent()
 	u.setupTray()
-	u.window.SetCloseIntercept(u.window.Hide)
+	u.window.SetCloseIntercept(u.onClose)
 	u.wireCallbacks()
 	return u
 }
@@ -167,6 +167,7 @@ func (u *UI) setupTray() {
 		fyne.NewMenuItem("Show window", u.window.Show),
 		fyne.NewMenuItem("Run now", u.onRunNow),
 		fyne.NewMenuItem("Pause or resume", func() { _ = u.sched.TogglePause() }),
+		fyne.NewMenuItem("Quit", u.fyneApp.Quit),
 	)
 	desk.SetSystemTrayMenu(menu)
 	desk.SetSystemTrayIcon(appIcon)
@@ -464,4 +465,15 @@ func (u *UI) onDeleteCandidates() {
 		u.candidates = nil
 		u.refreshCleanup()
 	}, u.window).Show()
+}
+
+// onClose handles the window's close button. By default the window
+// hides to the tray so the daily run keeps going; when the user has
+// asked for it, closing quits ZipClip instead.
+func (u *UI) onClose() {
+	if u.store.Get().QuitOnClose {
+		u.fyneApp.Quit()
+		return
+	}
+	u.window.Hide()
 }

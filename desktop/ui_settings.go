@@ -55,6 +55,7 @@ type settingsForm struct {
 	ffmpeg       *savingEntry
 	ffprobe      *savingEntry
 	devMode      *widget.Check
+	quitOnClose  *widget.Check
 	keepDays     *savingEntry
 	autoUpload   *widget.Check
 	ytClientID   *savingEntry
@@ -109,6 +110,7 @@ func (f *settingsForm) build(onEdit, onSave func()) {
 	f.ffmpeg = entry()
 	f.ffprobe = entry()
 	f.devMode = check("Run step by step: approve each cut, keep intermediate files")
+	f.quitOnClose = check("Quit ZipClip when the window is closed")
 	f.keepDays = entry()
 	f.autoUpload = check("Upload finished videos to YouTube automatically")
 	f.ytClientID = entry()
@@ -139,6 +141,7 @@ func (f *settingsForm) fill(cfg Config) {
 	f.ffmpeg.SetText(cfg.FfmpegPath)
 	f.ffprobe.SetText(cfg.FfprobePath)
 	f.devMode.SetChecked(cfg.DevMode)
+	f.quitOnClose.SetChecked(cfg.QuitOnClose)
 	f.keepDays.SetText(strconv.Itoa(cfg.KeepFinalDays))
 	f.autoUpload.SetChecked(cfg.AutoUpload)
 	f.ytClientID.SetText(cfg.YouTubeClientID)
@@ -161,6 +164,7 @@ func (f *settingsForm) collect(base Config) (Config, error) {
 	cfg.FfmpegPath = strings.TrimSpace(f.ffmpeg.Text)
 	cfg.FfprobePath = strings.TrimSpace(f.ffprobe.Text)
 	cfg.DevMode = f.devMode.Checked
+	cfg.QuitOnClose = f.quitOnClose.Checked
 	cfg.AutoUpload = f.autoUpload.Checked
 	cfg.YouTubeClientID = strings.TrimSpace(f.ytClientID.Text)
 	cfg.YouTubeClientSecret = strings.TrimSpace(f.ytSecret.Text)
@@ -238,6 +242,7 @@ func (u *UI) channelSection() fyne.CanvasObject {
 		"Which Twitch channel to watch and when the daily check runs.",
 		item("Channel", u.form.channel, "The channel name as it appears in the Twitch URL."),
 		item("Daily run time", u.form.runTime, "12-hour clock, for example 8:00 AM. Pick a time the stream is normally over."),
+		item("Close button", u.form.quitOnClose, "Off: closing the window hides ZipClip in the tray and the daily run still happens. On: closing the window quits, and nothing runs until you open it again."),
 	)
 }
 

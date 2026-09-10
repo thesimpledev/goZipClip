@@ -190,7 +190,7 @@ framerate, which is what lets ZipClip splice without re-encoding hours of
 video. Do this once, and again whenever you change the intro file or your
 stream output settings.
 
-ZipClip minimizes to the system tray; closing the window hides it, and the
+ZipClip minimizes to the system tray; closing the window hides it (or quits, with the Close button setting on), and the
 tray menu has Run now, Pause, and Quit.
 
 ## Settings notes

@@ -38,6 +38,7 @@ type Config struct {
 	FfmpegPath          string  `json:"ffmpegPath"`
 	FfprobePath         string  `json:"ffprobePath"`
 	DevMode             bool    `json:"devMode"`
+	QuitOnClose         bool    `json:"quitOnClose"`
 	KeepFinalDays       int     `json:"keepFinalDays"`
 	AutoUpload          bool    `json:"autoUpload"`
 	YouTubeClientID     string  `json:"youtubeClientId"`
