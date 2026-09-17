@@ -153,3 +153,45 @@ func TestChannelVideosURL(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 }
+
+func TestVodURLDropsTheIDPrefix(t *testing.T) {
+	want := "https://www.twitch.tv/videos/2345678901"
+	if got := vodURL("v2345678901"); got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if got := vodURL("2345678901"); got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestFilesToProcessIncludesLeftovers(t *testing.T) {
+	before := map[string]bool{"/w/raw/20260801-v1.mp4": true}
+	after := map[string]bool{
+		"/w/raw/20260801-v1.mp4": true,
+		"/w/raw/20260802-v2.mp4": true,
+	}
+	var logged []string
+	logf := func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }
+	got := filesToProcess(DefaultConfig(), logf, before, after)
+	if len(got) != 2 || got[0] != "/w/raw/20260801-v1.mp4" || got[1] != "/w/raw/20260802-v2.mp4" {
+		t.Fatalf("got %v", got)
+	}
+	if len(logged) != 1 {
+		t.Fatalf("expected one log line about the leftover, got %v", logged)
+	}
+}
+
+func TestFilesToProcessDevModeOnlyNew(t *testing.T) {
+	before := map[string]bool{"/w/raw/20260801-v1.mp4": true}
+	after := map[string]bool{
+		"/w/raw/20260801-v1.mp4": true,
+		"/w/raw/20260802-v2.mp4": true,
+	}
+	cfg := DefaultConfig()
+	cfg.DevMode = true
+	logf := func(string, ...any) {}
+	got := filesToProcess(cfg, logf, before, after)
+	if len(got) != 1 || got[0] != "/w/raw/20260802-v2.mp4" {
+		t.Fatalf("got %v", got)
+	}
+}

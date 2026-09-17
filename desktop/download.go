@@ -12,7 +12,10 @@ import (
 )
 
 // DownloadNew fetches any VODs not yet recorded in the download
-// archive and returns the paths of the new files, oldest first.
+// archive and returns the paths to process, oldest first: the new
+// files, plus any finished download still sitting in the raw folder
+// because an earlier run failed before it was processed. Dev mode
+// keeps raw files after processing, so there only the new files count.
 func DownloadNew(ctx context.Context, cfg Config, logf func(string, ...any)) ([]string, error) {
 	if ctx == nil || logf == nil {
 		return nil, errors.New("missing context or logger")
@@ -34,7 +37,23 @@ func DownloadNew(ctx context.Context, cfg Config, logf func(string, ...any)) ([]
 	if afterErr != nil {
 		return nil, afterErr
 	}
-	return newFiles(before, after), nil
+	return filesToProcess(cfg, logf, before, after), nil
+}
+
+// filesToProcess picks the raw files a run should process. Outside dev
+// mode a finished file that was already there when the download
+// started is a leftover from a failed run, and is processed again
+// without another download.
+func filesToProcess(cfg Config, logf func(string, ...any), before, after map[string]bool) []string {
+	if cfg.DevMode {
+		return newFiles(before, after)
+	}
+	all := newFiles(nil, after)
+	leftovers := len(all) - len(newFiles(before, after))
+	if leftovers > 0 {
+		logf("processing %d earlier download(s) left in the raw folder", leftovers)
+	}
+	return all
 }
 
 // SeedArchive catalogs the channel's existing VODs into the download
@@ -118,7 +137,7 @@ func recordLatestInArchive(ctx context.Context, cfg Config, logf func(string, ..
 		"--simulate",
 		"--force-write-download-archive",
 		"--no-progress",
-		"https://www.twitch.tv/videos/" + id,
+		vodURL(id),
 	}
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
 	cmd := newCommand(ctx, resolveYtdlp(cfg), args...)
@@ -146,6 +165,13 @@ func vodIDFromFilename(path string) (string, error) {
 		return "", fmt.Errorf("no VOD id in file name %q", path)
 	}
 	return id, nil
+}
+
+// vodURL builds the page URL for a VOD id. yt-dlp names Twitch VODs
+// with a leading "v" that the videos URL does not take, so it is
+// dropped.
+func vodURL(id string) string {
+	return "https://www.twitch.tv/videos/" + strings.TrimPrefix(id, "v")
 }
 
 // LatestVODID returns the id of the newest VOD on the channel without
