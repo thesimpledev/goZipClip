@@ -45,11 +45,11 @@
             <div class="version-grid">
                 <div class="version-item">
                     <span class="version-name">Windows</span>
-                    <span class="version-num">0.7.1 alpha</span>
+                    <span class="version-num">0.8.0 alpha</span>
                 </div>
                 <div class="version-item">
                     <span class="version-name">Linux</span>
-                    <span class="version-num">0.7.1 alpha</span>
+                    <span class="version-num">0.8.0 alpha</span>
                 </div>
             </div>
         </section>
@@ -65,6 +65,15 @@
         </section>
 
         -->
+
+        <section class="update-entry">
+            <h2>September 16, 2026 (0.8.0)</h2>
+            <ul class="update-list">
+                <li><strong>Fixed:</strong> "Run latest VOD" stopped with "yt-dlp archive record: exit status 1" right after the download finished. The VOD is now recorded correctly and processing carries on. (Windows 0.8.0, Linux 0.8.0)</li>
+                <li><strong>Downloads are never thrown away.</strong> If a run fails after a VOD has been downloaded, the next "Run now" or "Run latest VOD" processes the file already on disk instead of downloading it again.</li>
+                <li><strong>Quit from the tray.</strong> The tray menu has a Quit item, and a new "Close button" checkbox under Channel and schedule makes the window's close button quit ZipClip instead of hiding it to the tray.</li>
+            </ul>
+        </section>
 
         <section class="update-entry">
             <h2>September 5, 2026 (0.7.1)</h2>
