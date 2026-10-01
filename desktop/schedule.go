@@ -96,10 +96,36 @@ func (s *Scheduler) Loop(ctx context.Context) {
 			timer.Stop()
 			return
 		case <-timer.C:
-			s.fire(ctx, false)
+			if waitUntil(ctx, s.Next()) {
+				s.fire(ctx, false)
+			}
 		case <-s.runNow:
 			timer.Stop()
 			s.fire(ctx, true)
+		}
+	}
+}
+
+// waitUntil blocks until the wall clock reaches target and reports
+// false when ctx ended first. A day-long timer can fire a few seconds
+// early against the wall clock. Without this wait the run would start
+// early and the schedule, still seeing today's run time ahead of it,
+// would fire a second time.
+func waitUntil(ctx context.Context, target time.Time) bool {
+	if ctx == nil {
+		return false
+	}
+	for {
+		remaining := time.Until(target)
+		if remaining <= 0 {
+			return true
+		}
+		timer := time.NewTimer(remaining)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return false
+		case <-timer.C:
 		}
 	}
 }

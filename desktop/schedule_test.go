@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -50,6 +51,27 @@ func TestNextRunEvening(t *testing.T) {
 	want := time.Date(2026, 8, 6, 20, 30, 0, 0, time.UTC)
 	if !got.Equal(want) {
 		t.Fatalf("got %v want %v", got, want)
+	}
+}
+
+func TestWaitUntilWaitsOutAnEarlyTimer(t *testing.T) {
+	target := time.Now().Add(150 * time.Millisecond)
+	if !waitUntil(t.Context(), target) {
+		t.Fatal("a live context must reach the target")
+	}
+	if time.Now().Before(target) {
+		t.Fatal("waitUntil returned before the target time")
+	}
+	if !waitUntil(t.Context(), time.Now().Add(-time.Minute)) {
+		t.Fatal("a target in the past must return at once")
+	}
+}
+
+func TestWaitUntilStopsWhenCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if waitUntil(ctx, time.Now().Add(time.Hour)) {
+		t.Fatal("a cancelled context must stop the wait")
 	}
 }
 

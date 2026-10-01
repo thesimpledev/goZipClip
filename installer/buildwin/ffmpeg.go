@@ -170,7 +170,9 @@ func compileFfmpeg(paths ffmpegPaths) error {
 //	decoders                   h264/aac for VODs, the rest so a user's
 //	                           intro file in a common format decodes
 //	encoders                   libx264 + aac (intro re-encode),
-//	                           mjpeg (preview frame)
+//	                           mjpeg (preview frame, and the scan pass:
+//	                           the null muxer's default encoders are
+//	                           not built, so the scan names mjpeg)
 //	bsf aac_adtstoasc          yt-dlp's MPEG-TS to mp4 remux
 //	bsf h264_mp4toannexb       stream-copy between container types
 //	filters                    scene scan (select, showinfo), intro

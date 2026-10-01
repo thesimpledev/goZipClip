@@ -184,11 +184,12 @@ already marked as handled; ZipClip warns you first in that case.
 
 ### 7. Prepare the intro
 
-Once the first VOD has downloaded, press "Prepare intro" in Settings. This
-re-encodes your intro to exactly match the VOD's codec, resolution, and
-framerate, which is what lets ZipClip splice without re-encoding hours of
-video. Do this once, and again whenever you change the intro file or your
-stream output settings.
+A run prepares the intro by itself: before the first splice, and again
+whenever the intro file is newer than the prepared copy or the VOD's
+format has changed, it re-encodes your intro to exactly match the VOD's
+codec, resolution, and framerate. That is what lets ZipClip splice
+without re-encoding hours of video. The "Prepare intro" button in
+Settings does the same thing by hand against the newest downloaded VOD.
 
 ZipClip minimizes to the system tray; closing the window hides it (or quits, with the Close button setting on), and the
 tray menu has Run now, Pause, and Quit.
@@ -201,8 +202,10 @@ tray menu has Run now, Pause, and Quit.
   scene threshold, and cut backoff only apply while this is on.
 - **Intro**: whether the intro is spliced onto the front. Untick it and
   no intro file is needed.
-- **Scene threshold**: fraction of the picture that must change in one frame
-  step to count as the stream starting. `0.4` works for a mostly static
+- **Scene threshold**: fraction of the picture that must change from one
+  second to the next to count as the stream starting. The picture is
+  sampled once a second, so a fade between scenes counts as one change.
+  `0.4` works for a mostly static
   waiting screen. If detection fires too early (an alert popup, a busy
   animation), raise it; if it never fires, lower it. A run where nothing
   is detected no longer stops with an error: the full VOD is kept, and

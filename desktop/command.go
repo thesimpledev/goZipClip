@@ -7,15 +7,24 @@ import (
 	"errors"
 	"io"
 	"os/exec"
+	"time"
 )
 
+// cancelWaitDelay is how long a cancelled tool's output is still read
+// before the run stops waiting for it. Without a limit, a process the
+// tool started and left behind keeps the run blocked until it ends.
+const cancelWaitDelay = 5 * time.Second
+
 // newCommand builds a child process command the way every tool launch
-// in ZipClip must: tied to ctx so a cancelled run kills it, and with
-// no console window of its own on Windows (see hideConsole).
+// in ZipClip must: tied to ctx so a cancelled run kills it together
+// with the processes it started (see killTreeOnCancel), and with no
+// console window of its own on Windows (see hideConsole).
 func newCommand(ctx context.Context, name string, args ...string) *exec.Cmd {
 	// #nosec G204 -- the executable and arguments come from the user's own configuration
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.WaitDelay = cancelWaitDelay
 	hideConsole(cmd)
+	killTreeOnCancel(cmd)
 	return cmd
 }
 

@@ -36,7 +36,7 @@ func TrimFrom(ctx context.Context, cfg Config, vodPath string, cut float64, outP
 		func() float64 { return combinedDuration(ctx, cfg, vodPath) - cut })
 	out, runErr := runCapturingStderr(cmd, handler)
 	if runErr != nil {
-		return fmt.Errorf("ffmpeg trim: %w: %s", runErr, truncate(string(out), 300))
+		return fmt.Errorf("ffmpeg trim: %w: %s", runErr, tail(string(out), 300))
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func ConcatIntro(ctx context.Context, cfg Config, introPath, trimmedPath, outPat
 		func() float64 { return combinedDuration(ctx, cfg, introPath, trimmedPath) })
 	out, runErr := runCapturingStderr(cmd, handler)
 	if runErr != nil {
-		return fmt.Errorf("ffmpeg concat: %w: %s", runErr, truncate(string(out), 300))
+		return fmt.Errorf("ffmpeg concat: %w: %s", runErr, tail(string(out), 300))
 	}
 	return nil
 }

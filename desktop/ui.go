@@ -30,6 +30,9 @@ type UI struct {
 	logger  *Logger
 	pipe    *Pipeline
 	sched   *Scheduler
+	// ctx ends when the app quits, so the runs and tool calls the UI
+	// starts are stopped with everything else.
+	ctx context.Context
 
 	tabs         *container.AppTabs
 	dashboardTab *container.TabItem
@@ -65,6 +68,7 @@ func NewUI(cfgPath string, store *ConfigStore, logger *Logger, pipe *Pipeline, s
 		logger:  logger,
 		pipe:    pipe,
 		sched:   sched,
+		ctx:     context.Background(),
 	}
 	u.fyneApp.SetIcon(appIcon)
 	u.fyneApp.Settings().SetTheme(newZipTheme())
@@ -75,6 +79,14 @@ func NewUI(cfgPath string, store *ConfigStore, logger *Logger, pipe *Pipeline, s
 	u.window.SetCloseIntercept(u.onClose)
 	u.wireCallbacks()
 	return u
+}
+
+// SetContext gives the UI the context that ends when the app quits.
+// main sets it once, before ShowAndRun.
+func (u *UI) SetContext(ctx context.Context) {
+	if ctx != nil {
+		u.ctx = ctx
+	}
 }
 
 // Window dimensions: the default size, and the floor below which the
@@ -312,7 +324,7 @@ func (u *UI) onRunLatest() {
 func (u *UI) runLatestChecked() {
 	cfg := u.store.Get()
 	go func() {
-		id, idErr := LatestVODID(context.Background(), cfg, u.logger.Logf)
+		id, idErr := LatestVODID(u.ctx, cfg, u.logger.Logf)
 		if idErr != nil {
 			fyne.Do(func() { dialog.ShowError(idErr, u.window) })
 			return
@@ -335,7 +347,7 @@ func (u *UI) runLatestChecked() {
 // runLatest runs the pipeline on the newest VOD and surfaces errors.
 func (u *UI) runLatest() {
 	go func() {
-		runErr := u.pipe.RunLatest(context.Background())
+		runErr := u.pipe.RunLatest(u.ctx)
 		if runErr != nil && !errors.Is(runErr, context.Canceled) {
 			fyne.Do(func() { dialog.ShowError(runErr, u.window) })
 		}
@@ -347,7 +359,7 @@ func (u *UI) runLatest() {
 func (u *UI) startCatalog() {
 	u.tabs.Select(u.dashboardTab)
 	go func() {
-		catErr := u.pipe.Catalog(context.Background())
+		catErr := u.pipe.Catalog(u.ctx)
 		if catErr != nil && !errors.Is(catErr, context.Canceled) {
 			fyne.Do(func() { dialog.ShowError(catErr, u.window) })
 		}
@@ -397,7 +409,7 @@ func (u *UI) onPreviewAt() {
 		return
 	}
 	go func() {
-		if prevErr := u.pipe.RegeneratePreview(context.Background(), at); prevErr != nil {
+		if prevErr := u.pipe.RegeneratePreview(u.ctx, at); prevErr != nil {
 			fyne.Do(func() { dialog.ShowError(prevErr, u.window) })
 			return
 		}

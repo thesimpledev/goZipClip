@@ -13,6 +13,9 @@ func TestListVideoFilesSkipsPartials(t *testing.T) {
 	writeTestFile(t, filepath.Join(dir, "20260801-v123.mp4"))
 	writeTestFile(t, filepath.Join(dir, "20260802-v456.mp4.part"))
 	writeTestFile(t, filepath.Join(dir, "20260802-v456.mp4.ytdl"))
+	writeTestFile(t, filepath.Join(dir, "20260802-v456.mp4.part-Frag12"))
+	writeTestFile(t, filepath.Join(dir, "20260802-v456.mp4.part-Frag13.part"))
+	writeTestFile(t, filepath.Join(dir, "20260803-v789.temp.mp4"))
 	if mkErr := os.MkdirAll(filepath.Join(dir, "subdir"), 0o755); mkErr != nil {
 		t.Fatalf("mkdir: %v", mkErr)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNewCommandKeepsPathAndArgs(t *testing.T) {
@@ -11,7 +12,7 @@ func TestNewCommandKeepsPathAndArgs(t *testing.T) {
 	if len(cmd.Args) != 3 || cmd.Args[0] != "sh" || cmd.Args[2] != "true" {
 		t.Fatalf("args got %v", cmd.Args)
 	}
-	if !strings.HasSuffix(cmd.Path, "sh") {
+	if !strings.HasSuffix(strings.TrimSuffix(cmd.Path, ".exe"), "sh") {
 		t.Fatalf("path got %q", cmd.Path)
 	}
 }
@@ -25,6 +26,23 @@ func TestRunStreamingMergesBothStreams(t *testing.T) {
 	joined := strings.Join(lines, ",")
 	if !strings.Contains(joined, "out") || !strings.Contains(joined, "err") {
 		t.Fatalf("lines got %v", lines)
+	}
+}
+
+func TestCancelStopsToolAndItsChildren(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cmd := newCommand(ctx, "sh", "-c", "sleep 60; true")
+	done := make(chan error, 1)
+	go func() { done <- runStreaming(cmd, func(string) {}) }()
+	time.Sleep(500 * time.Millisecond)
+	cancel()
+	select {
+	case runErr := <-done:
+		if runErr == nil {
+			t.Fatal("a cancelled tool must report an error")
+		}
+	case <-time.After(cancelWaitDelay + 10*time.Second):
+		t.Fatal("the run was still waiting on the cancelled tool")
 	}
 }
 

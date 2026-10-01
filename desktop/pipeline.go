@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // State names the pipeline's current activity.
@@ -260,13 +261,49 @@ func (p *Pipeline) run(ctx context.Context) error {
 		p.setState(StateIdle, "no new VODs")
 		return nil
 	}
+	return p.processAll(ctx, cfg, files)
+}
+
+// processAll processes every VOD in turn. A VOD that fails does not
+// stop the ones after it: its raw file stays in the work folder and the
+// next run tries it again. A cancelled run stops at once.
+func (p *Pipeline) processAll(ctx context.Context, cfg Config, files []string) error {
+	var firstErr error
+	failed := 0
 	for _, vod := range files {
-		if procErr := p.processOne(ctx, cfg, vod); procErr != nil {
+		procErr := p.processOne(ctx, cfg, vod)
+		if procErr == nil {
+			continue
+		}
+		if ctx.Err() != nil {
 			return procErr
 		}
+		failed++
+		if firstErr == nil {
+			firstErr = procErr
+		}
+	}
+	if firstErr != nil {
+		p.setState(StateError, fmt.Sprintf("%d of %d VOD(s) failed, first: %v", failed, len(files), firstErr))
+		return firstErr
 	}
 	p.setState(StateIdle, fmt.Sprintf("finished %d VOD(s)", len(files)))
 	return nil
+}
+
+// WaitIdle blocks until no run is in progress or the timeout passes,
+// and reports whether the pipeline went idle. The app calls it on quit,
+// after cancelling, so the tools of the cancelled run are stopped
+// before the process exits.
+func (p *Pipeline) WaitIdle(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for p.Running() {
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return true
 }
 
 // RunLatest downloads and processes the newest VOD on the channel,
@@ -402,6 +439,9 @@ func (p *Pipeline) resolveCut(ctx context.Context, cfg Config, vodPath string) (
 	if detectErr != nil {
 		return 0, detectErr
 	}
+	if cut > 0 {
+		p.logger.Logf("stream start found in %s; cutting at %s", filepath.Base(vodPath), formatTimestamp(cut))
+	}
 	preview := filepath.Join(cfg.WorkDir, "preview.jpg")
 	if prevErr := ExtractPreview(ctx, cfg, vodPath, cut, preview); prevErr != nil {
 		p.logger.Logf("preview failed (continuing): %v", prevErr)
@@ -488,12 +528,31 @@ func (p *Pipeline) trimAndConcat(ctx context.Context, cfg Config, vodPath string
 	if trimErr := TrimFrom(ctx, cfg, vodPath, cut, trimmed); trimErr != nil {
 		return trimErr
 	}
-	intro := introForConcat(cfg)
+	intro, introErr := p.readyIntro(ctx, cfg, trimmed)
+	if introErr != nil {
+		return introErr
+	}
 	if concatErr := ConcatIntro(ctx, cfg, intro, trimmed, outPath); concatErr != nil {
 		return concatErr
 	}
 	p.setState(StateVerifying, filepath.Base(outPath))
 	return p.verify(ctx, cfg, intro, trimmed, outPath)
+}
+
+// readyIntro returns the intro to join onto vodPath, re-encoding the
+// configured intro first when no prepared copy matches the VOD. Joining
+// an intro that does not match produces a broken file.
+func (p *Pipeline) readyIntro(ctx context.Context, cfg Config, vodPath string) (string, error) {
+	stale, checkErr := introNeedsPrepare(ctx, cfg, vodPath)
+	if checkErr != nil {
+		return "", checkErr
+	}
+	if stale {
+		if prepErr := prepareIntroFor(ctx, cfg, vodPath, p.logger.Logf); prepErr != nil {
+			return "", prepErr
+		}
+	}
+	return introReadyPath(cfg), nil
 }
 
 // trimOnly cuts the VOD straight into the output folder. With no intro
@@ -509,14 +568,11 @@ func (p *Pipeline) trimOnly(ctx context.Context, cfg Config, vodPath string, cut
 }
 
 // concatOnly splices the intro onto the full VOD and verifies the
-// combined duration.
+// combined duration. The VOD goes through the cut step with a cut of
+// zero first: a downloaded VOD carries its audio track before its video
+// track, and that stream copy puts them in the order the join expects.
 func (p *Pipeline) concatOnly(ctx context.Context, cfg Config, vodPath, outPath string) error {
-	intro := introForConcat(cfg)
-	if concatErr := ConcatIntro(ctx, cfg, intro, vodPath, outPath); concatErr != nil {
-		return concatErr
-	}
-	p.setState(StateVerifying, filepath.Base(outPath))
-	return p.verify(ctx, cfg, intro, vodPath, outPath)
+	return p.trimAndConcat(ctx, cfg, vodPath, 0, outPath)
 }
 
 // deliverRaw moves the untouched VOD into the output folder. The move

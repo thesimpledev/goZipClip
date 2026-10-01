@@ -46,10 +46,27 @@ func main() {
 	pipe.SetToolsReady(ytdlpReady)
 	sched := NewScheduler(store, logger, pipe)
 	ui := NewUI(cfgPath, store, logger, pipe, sched)
+	ui.SetContext(ctx)
 	go sched.Loop(ctx)
 	ui.ShowAndRun()
 	cancel()
+	waitForRun(pipe, logger)
 	logger.Close()
+}
+
+// quitWait is how long quitting waits for a cancelled run to stop.
+const quitWait = 2 * cancelWaitDelay
+
+// waitForRun gives the tools of a run that was cancelled by quitting
+// the time to be stopped, or they would keep running after ZipClip is
+// gone.
+func waitForRun(pipe *Pipeline, logger *Logger) {
+	if pipe == nil || logger == nil {
+		return
+	}
+	if !pipe.WaitIdle(quitWait) {
+		logger.Logf("quit: the run in progress did not stop within %s", quitWait)
+	}
 }
 
 func executableDir() string {

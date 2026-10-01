@@ -51,23 +51,65 @@ func TestParseProbeParamsBadJSON(t *testing.T) {
 	}
 }
 
-func TestIntroForConcatFallsBack(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.WorkDir = t.TempDir()
-	cfg.IntroFile = "/videos/intro.mp4"
-	if got := introForConcat(cfg); got != "/videos/intro.mp4" {
-		t.Fatalf("got %q, expected the configured intro", got)
+func TestParseProbeParamsReadsTimeScale(t *testing.T) {
+	fixture := `{"streams":[{"codec_type":"video","codec_name":"h264","width":1280,"height":720,` +
+		`"avg_frame_rate":"30/1","time_base":"1/90000"}]}`
+	params, parseErr := parseProbeParams([]byte(fixture))
+	if parseErr != nil {
+		t.Fatalf("unexpected error: %v", parseErr)
+	}
+	if params.TimeScale != "90000" {
+		t.Fatalf("got time scale %q, want 90000", params.TimeScale)
 	}
 }
 
-func TestIntroForConcatPrefersPrepared(t *testing.T) {
+func TestTimeScale(t *testing.T) {
+	cases := map[string]string{
+		"1/90000": "90000",
+		"1/15360": "15360",
+		"":        "",
+		"90000":   "",
+		"2/90000": "",
+		"1/abc":   "",
+	}
+	for input, want := range cases {
+		if got := timeScale(input); got != want {
+			t.Fatalf("%q: got %q want %q", input, got, want)
+		}
+	}
+}
+
+func TestJoinsWith(t *testing.T) {
+	vod := mediaParams{
+		Codec: "h264", Width: 1280, Height: 720,
+		FrameRate: "30/1", TimeScale: "90000", SampleRate: "48000", Channels: 2,
+	}
+	same := vod
+	same.FrameRate = "387162000/12905401"
+	if !same.joinsWith(vod) {
+		t.Fatal("a different frame rate spelling must not stop the join")
+	}
+	otherScale := vod
+	otherScale.TimeScale = "15360"
+	if otherScale.joinsWith(vod) {
+		t.Fatal("a different video timescale must stop the join")
+	}
+	otherSize := vod
+	otherSize.Height = 1080
+	if otherSize.joinsWith(vod) {
+		t.Fatal("a different resolution must stop the join")
+	}
+}
+
+func TestIntroNeedsPrepareWithoutPreparedCopy(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.WorkDir = t.TempDir()
-	cfg.IntroFile = "/videos/intro.mp4"
-	ready := introReadyPath(cfg)
-	writeTestFile(t, ready)
-	if got := introForConcat(cfg); got != ready {
-		t.Fatalf("got %q, expected the prepared intro %q", got, ready)
+	stale, checkErr := introNeedsPrepare(t.Context(), cfg, "vod.mp4")
+	if checkErr != nil {
+		t.Fatalf("unexpected error: %v", checkErr)
+	}
+	if !stale {
+		t.Fatal("a missing prepared intro must be reported as needing preparation")
 	}
 }
 
@@ -76,11 +118,11 @@ func TestPrepareArgsIncludesAudioLayout(t *testing.T) {
 	cfg.IntroFile = "/videos/intro.mp4"
 	params := mediaParams{
 		Codec: "h264", Width: 1920, Height: 1080,
-		FrameRate: "60/1", SampleRate: "44100", Channels: 2,
+		FrameRate: "60/1", TimeScale: "90000", SampleRate: "44100", Channels: 2,
 	}
 	args := prepareArgs(cfg, params, "/work/intro_ready.mp4")
 	joined := strings.Join(args, " ")
-	for _, want := range []string{"scale=1920:1080", "60/1", "44100", "libx264"} {
+	for _, want := range []string{"scale=1920:1080", "60/1", "44100", "libx264", "-video_track_timescale", "90000"} {
 		if !slices.Contains(args, want) {
 			t.Fatalf("args missing %q: %s", want, joined)
 		}

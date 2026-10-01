@@ -395,7 +395,7 @@ func (u *UI) saveSettings(done func()) {
 func (u *UI) confirmChannel(previous string, cfg Config, done func()) {
 	u.form.setStatus("Checking channel "+cfg.Channel+"...", widget.MediumImportance)
 	go func() {
-		lookErr := LookupChannel(context.Background(), cfg, u.logger.Logf)
+		lookErr := LookupChannel(u.ctx, cfg, u.logger.Logf)
 		fyne.Do(func() {
 			if lookErr != nil {
 				dialog.ShowError(lookErr, u.window)
@@ -443,7 +443,7 @@ func (u *UI) restoreChannel(previous string) {
 func (u *UI) onPrepareIntro() {
 	cfg := u.store.Get()
 	go func() {
-		prepErr := PrepareIntro(context.Background(), cfg, u.logger.Logf)
+		prepErr := PrepareIntro(u.ctx, cfg, u.logger.Logf)
 		fyne.Do(func() {
 			if prepErr != nil {
 				dialog.ShowError(prepErr, u.window)
@@ -468,7 +468,7 @@ func (u *UI) onConnectYouTube() {
 		return u.fyneApp.OpenURL(parsed)
 	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		ctx, cancel := context.WithTimeout(u.ctx, 5*time.Minute)
 		defer cancel()
 		authErr := NewYouTubeClient(cfg).Authorize(ctx, openURL)
 		fyne.Do(func() {

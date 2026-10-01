@@ -37,9 +37,9 @@ func DetectCut(ctx context.Context, cfg Config, vodPath string) (float64, error)
 		func() float64 { return scanTotal(ctx, cfg, vodPath) })
 	out, runErr := runCapturingStderr(cmd, handler)
 	if runErr != nil {
-		return 0, fmt.Errorf("ffmpeg scene scan: %w: %s", runErr, truncate(string(out), 300))
+		return 0, fmt.Errorf("ffmpeg scene scan: %w: %s", runErr, tail(string(out), 300))
 	}
-	ts, found := firstPtsTime(bytes.NewReader(out))
+	ts, found := sceneChangeTime(bytes.NewReader(out))
 	if !found {
 		return 0, noSceneChange(cfg)
 	}
@@ -50,15 +50,24 @@ func DetectCut(ctx context.Context, cfg Config, vodPath string) (float64, error)
 	return cut, nil
 }
 
+// sceneScanArgs builds the scan call. The picture is sampled once a
+// second, so a switch that fades over many frames still shows up as one
+// large change. The opening frame is always let through: ffmpeg fails
+// when no frame at all reaches the output, which is what a VOD with no
+// scene change would otherwise cause. Audio is left out, and the encoder
+// is named because the null output's default encoders are not in the
+// bundled Windows ffmpeg.
 func sceneScanArgs(cfg Config, vodPath string) []string {
-	filter := fmt.Sprintf("scale=320:-1,select='gt(scene,%s)',showinfo",
+	filter := fmt.Sprintf("fps=1,scale=320:-1,select='eq(n,0)+gt(scene,%s)',showinfo",
 		strconv.FormatFloat(cfg.SceneThreshold, 'f', -1, 64))
 	args := []string{"-hide_banner", "-nostats"}
 	args = append(args, ffmpegProgressArgs()...)
 	return append(args,
 		"-i", vodPath,
 		"-t", strconv.Itoa(cfg.ScanWindowMinutes*60),
+		"-an",
 		"-vf", filter,
+		"-c:v", "mjpeg",
 		"-f", "null", "-",
 	)
 }
@@ -73,12 +82,15 @@ func scanTotal(ctx context.Context, cfg Config, vodPath string) float64 {
 	return total
 }
 
-// firstPtsTime scans ffmpeg showinfo output for the first frame
-// timestamp and reports whether one was found.
-func firstPtsTime(r io.Reader) (float64, bool) {
+// sceneChangeTime scans ffmpeg showinfo output for the timestamp of the
+// first scene change and reports whether one was found. The scan always
+// lets the VOD's opening frame through (see sceneScanArgs), so the first
+// frame showinfo reports is that one and the change is the frame after.
+func sceneChangeTime(r io.Reader) (float64, bool) {
 	if r == nil {
 		return 0, false
 	}
+	openingSeen := false
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -92,6 +104,10 @@ func firstPtsTime(r io.Reader) (float64, bool) {
 		}
 		value, parseErr := strconv.ParseFloat(match[1], 64)
 		if parseErr != nil {
+			continue
+		}
+		if !openingSeen {
+			openingSeen = true
 			continue
 		}
 		return value, true
@@ -116,7 +132,7 @@ func ExtractPreview(ctx context.Context, cfg Config, vodPath string, at float64,
 	cmd := newCommand(ctx, resolveFfmpeg(cfg), args...)
 	out, runErr := runCapturingStderr(cmd, nil)
 	if runErr != nil {
-		return fmt.Errorf("ffmpeg preview: %w: %s", runErr, truncate(string(out), 300))
+		return fmt.Errorf("ffmpeg preview: %w: %s", runErr, tail(string(out), 300))
 	}
 	return nil
 }

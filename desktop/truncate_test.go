@@ -10,3 +10,12 @@ func TestTruncate(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestTail(t *testing.T) {
+	if got := tail("short", 10); got != "short" {
+		t.Fatalf("got %q", got)
+	}
+	if got := tail("0123456789abc", 10); got != "...3456789abc" {
+		t.Fatalf("got %q", got)
+	}
+}

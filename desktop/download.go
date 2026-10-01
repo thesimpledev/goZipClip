@@ -285,12 +285,20 @@ func listVideoFiles(dir string) (map[string]bool, error) {
 			continue
 		}
 		name := entry.Name()
-		if strings.HasSuffix(name, ".part") || strings.HasSuffix(name, ".ytdl") || strings.HasSuffix(name, ".tmp") {
+		if isUnfinishedDownload(name) {
 			continue
 		}
 		files[filepath.Join(dir, name)] = true
 	}
 	return files, nil
+}
+
+// isUnfinishedDownload reports whether name is a file yt-dlp leaves
+// behind when a download is interrupted: a partial file, a fragment of
+// one, its bookkeeping file, or the temporary copy its remux writes.
+func isUnfinishedDownload(name string) bool {
+	return strings.Contains(name, ".part") || strings.Contains(name, ".temp.") ||
+		strings.HasSuffix(name, ".ytdl") || strings.HasSuffix(name, ".tmp")
 }
 
 // newFiles returns paths present in after but not in before, sorted.

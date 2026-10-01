@@ -17,35 +17,59 @@ func TestNoSceneChangeIsSentinel(t *testing.T) {
 	}
 }
 
+func TestSceneScanArgs(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.SceneThreshold = 0.4
+	cfg.ScanWindowMinutes = 30
+	args := sceneScanArgs(cfg, "vod.mp4")
+	joined := strings.Join(args, " ")
+	for _, want := range []string{
+		"-i vod.mp4", "-t 1800", "-an", "-c:v mjpeg", "-f null -",
+		"fps=1,scale=320:-1,select='eq(n,0)+gt(scene,0.4)',showinfo",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("args missing %q: %s", want, joined)
+		}
+	}
+}
+
 // synthesized ffmpeg stderr output in the shape showinfo produces
 const showinfoFixture = `Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'vod.mp4':
   Duration: 03:52:10.00, start: 0.000000, bitrate: 6000 kb/s
 Stream mapping:
-  Stream #0:0 -> #0:0 (h264 (native) -> wrapped_avframe (native))
-[Parsed_showinfo_2 @ 0x5591a] n:   0 pts: 776448 pts_time:849.5   duration_time:0.016667 fmt:yuv420p
-[Parsed_showinfo_2 @ 0x5591a] n:   1 pts: 792115 pts_time:866.375 duration_time:0.016667 fmt:yuv420p
+  Stream #0:0 -> #0:0 (h264 (native) -> mjpeg (native))
+[Parsed_showinfo_3 @ 0x5591a] n:   0 pts:      0 pts_time:0       duration_time:1 fmt:yuv420p
+[Parsed_showinfo_3 @ 0x5591a] n:   1 pts:    850 pts_time:850     duration_time:1 fmt:yuv420p
+[Parsed_showinfo_3 @ 0x5591a] n:   2 pts:    866 pts_time:866     duration_time:1 fmt:yuv420p
 [out#0/null @ 0x5591b] video:41KiB audio:0KiB subtitle:0KiB
 `
 
-func TestFirstPtsTime(t *testing.T) {
-	got, found := firstPtsTime(strings.NewReader(showinfoFixture))
+func TestSceneChangeTime(t *testing.T) {
+	got, found := sceneChangeTime(strings.NewReader(showinfoFixture))
 	if !found {
 		t.Fatal("expected a timestamp")
 	}
-	if math.Abs(got-849.5) > 0.001 {
-		t.Fatalf("got %v want 849.5", got)
+	if math.Abs(got-850) > 0.001 {
+		t.Fatalf("got %v want 850", got)
 	}
 }
 
-func TestFirstPtsTimeNoMatch(t *testing.T) {
+func TestSceneChangeTimeOnlyOpeningFrame(t *testing.T) {
+	fixture := "[Parsed_showinfo_3 @ 0x5591a] n:   0 pts:      0 pts_time:0       duration_time:1 fmt:yuv420p\n"
+	if _, found := sceneChangeTime(strings.NewReader(fixture)); found {
+		t.Fatal("the opening frame alone is not a scene change")
+	}
+}
+
+func TestSceneChangeTimeNoMatch(t *testing.T) {
 	fixture := "Input #0, mov, from 'vod.mp4':\n  Duration: 03:52:10.00\n"
-	if _, found := firstPtsTime(strings.NewReader(fixture)); found {
+	if _, found := sceneChangeTime(strings.NewReader(fixture)); found {
 		t.Fatal("expected no timestamp")
 	}
 }
 
-func TestFirstPtsTimeNilReader(t *testing.T) {
-	if _, found := firstPtsTime(nil); found {
+func TestSceneChangeTimeNilReader(t *testing.T) {
+	if _, found := sceneChangeTime(nil); found {
 		t.Fatal("expected no timestamp from a nil reader")
 	}
 }
