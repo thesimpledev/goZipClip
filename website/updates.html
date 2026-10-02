@@ -45,11 +45,11 @@
             <div class="version-grid">
                 <div class="version-item">
                     <span class="version-name">Windows</span>
-                    <span class="version-num">0.8.0 alpha</span>
+                    <span class="version-num">0.8.1 alpha</span>
                 </div>
                 <div class="version-item">
                     <span class="version-name">Linux</span>
-                    <span class="version-num">0.8.0 alpha</span>
+                    <span class="version-num">0.8.1 alpha</span>
                 </div>
             </div>
         </section>
@@ -65,6 +65,18 @@
         </section>
 
         -->
+
+        <section class="update-entry">
+            <h2>October 1, 2026 (0.8.1)</h2>
+            <ul class="update-list">
+                <li><strong>Fixed:</strong> on Windows, the starting-soon screen was never cut off: the scan that finds the real start could not run with the bundled ffmpeg. The scan now works, and a slow fade from the starting-soon screen is found as one change instead of many small ones. (Windows 0.8.1, Linux 0.8.1)</li>
+                <li><strong>Fixed:</strong> adding the intro could produce a video of the wrong length, and with the cut switched off the result could come out with its picture and sound scrambled. The intro is now prepared to match each VOD, so the join is clean with or without the cut.</li>
+                <li><strong>Fixed:</strong> on Windows, Cancel could leave the download running in the background and the run stuck waiting. Cancel now stops the download completely, and quitting ZipClip stops a run in progress.</li>
+                <li><strong>Fixed:</strong> the daily run could start twice in a row.</li>
+                <li><strong>One bad VOD no longer blocks the rest.</strong> If a VOD fails, ZipClip carries on with the ones after it. Leftover partial download files are no longer mistaken for VODs.</li>
+                <li><strong>A more useful log.</strong> When ffmpeg fails, the log shows the part of its output that gives the reason, and every cut records where it landed.</li>
+            </ul>
+        </section>
 
         <section class="update-entry">
             <h2>September 16, 2026 (0.8.0)</h2>
